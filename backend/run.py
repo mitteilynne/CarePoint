@@ -1,6 +1,6 @@
 import os
 from app import create_app, db
-from app.models import User, Organization, PasswordReset, Patient, Department, Appointment, MedicalRecord
+from app.models import User, Organization, PasswordReset, Patient, Department, Appointment, MedicalRecord, Triage, QueueManagement
 
 app = create_app(os.getenv('FLASK_CONFIG', 'default'))
 
@@ -14,7 +14,9 @@ def make_shell_context():
         'Patient': Patient,
         'Department': Department,
         'Appointment': Appointment,
-        'MedicalRecord': MedicalRecord
+        'MedicalRecord': MedicalRecord,
+        'Triage': Triage,
+        'QueueManagement': QueueManagement
     }
 
 if __name__ == '__main__':

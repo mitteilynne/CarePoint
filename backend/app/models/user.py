@@ -14,7 +14,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
-    role = db.Column(db.Enum('patient', 'doctor', 'admin', name='user_roles'), 
+    role = db.Column(db.Enum('patient', 'doctor', 'admin', 'receptionist', 'nurse', name='user_roles'), 
                      nullable=False, default='patient')
     phone = db.Column(db.String(20))
     address = db.Column(db.Text)
