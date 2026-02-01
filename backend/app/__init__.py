@@ -20,15 +20,6 @@ def create_app(config_name='default'):
     CORS(app)
     
     # Register blueprints
-<<<<<<< Updated upstream
-=======
-<<<<<<< HEAD
-    from app.routes.auth import auth_bp
-    from app.routes.users import user_bp
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(user_bp, url_prefix='/api')
-=======
->>>>>>> Stashed changes
     from app.routes.auth import bp as auth_bp
     from app.routes.main import bp as main_bp
     from app.routes.organization import bp as organization_bp
@@ -40,9 +31,5 @@ def create_app(config_name='default'):
     app.register_blueprint(organization_bp)
     app.register_blueprint(healthcare_bp)
     app.register_blueprint(receptionist_bp)
-<<<<<<< Updated upstream
-=======
->>>>>>> side
->>>>>>> Stashed changes
     
     return app
