@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import OrganizationCodeInput from '@/components/OrganizationCodeInput';
 
 export default function Login() {
   const [formData, setFormData] = useState({
+    organizationCode: '',
     login: '',
     password: '',
     rememberMe: false,
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const { login, isLoading } = useAuth();
@@ -23,10 +26,20 @@ export default function Login() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(''); // Clear success message when user starts typing
+    setFieldErrors({}); // Clear field errors
     const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
       [name]: type === 'checkbox' ? checked : value,
+    });
+  };
+
+  const handleOrganizationCodeChange = (value: string) => {
+    setMessage('');
+    setFieldErrors({});
+    setFormData({
+      ...formData,
+      organizationCode: value,
     });
   };
 
@@ -35,23 +48,30 @@ export default function Login() {
     setError('');
 
     // Basic validation
+    const errors: Record<string, string> = {};
+
+    if (!formData.organizationCode.trim()) {
+      errors.organizationCode = 'Organization code is required';
+    }
+
     if (!formData.login.trim()) {
-      setError('Email or username is required');
-      return;
+      errors.login = 'Email or username is required';
     }
 
     if (!formData.password) {
-      setError('Password is required');
-      return;
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long';
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Please fix the errors below');
       return;
     }
 
     try {
-      await login(formData.login, formData.password);
+      await login(formData.organizationCode, formData.login, formData.password);
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed');
@@ -68,10 +88,10 @@ export default function Login() {
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Welcome to CarePoint
+            Sign in to CarePoint
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to your account to continue
+            Access your healthcare facility's patient management system
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -88,6 +108,13 @@ export default function Login() {
           )}
           
           <div className="space-y-4">
+            <OrganizationCodeInput
+              value={formData.organizationCode}
+              onChange={handleOrganizationCodeChange}
+              error={fieldErrors.organizationCode}
+              placeholder="e.g. HOSP001, CLINIC123"
+            />
+            
             <div>
               <label htmlFor="login" className="block text-sm font-medium text-gray-700">
                 Email or Username
@@ -98,13 +125,21 @@ export default function Login() {
                   name="login"
                   type="text"
                   required
-                  className="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200"
+                  className={`appearance-none relative block w-full px-4 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 transition duration-200 ${
+                    fieldErrors.login
+                      ? 'border-red-300 focus:ring-red-500 focus:border-transparent'
+                      : 'border-gray-300 focus:ring-primary-500 focus:border-transparent'
+                  }`}
                   placeholder="Enter your email or username"
                   value={formData.login}
                   onChange={handleChange}
                 />
               </div>
+              {fieldErrors.login && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.login}</p>
+              )}
             </div>
+            
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
@@ -115,12 +150,19 @@ export default function Login() {
                   name="password"
                   type="password"
                   required
-                  className="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200"
+                  className={`appearance-none relative block w-full px-4 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 transition duration-200 ${
+                    fieldErrors.password
+                      ? 'border-red-300 focus:ring-red-500 focus:border-transparent'
+                      : 'border-gray-300 focus:ring-primary-500 focus:border-transparent'
+                  }`}
                   placeholder="Enter your password"
                   value={formData.password}
                   onChange={handleChange}
                 />
               </div>
+              {fieldErrors.password && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+              )}
             </div>
           </div>
 

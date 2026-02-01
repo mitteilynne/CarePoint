@@ -8,8 +8,9 @@ class User(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    username = db.Column(db.String(80), nullable=False, index=True)
+    email = db.Column(db.String(120), nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
@@ -23,13 +24,22 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, 
                           onupdate=datetime.utcnow, nullable=False)
     
-    def __init__(self, username, email, first_name, last_name, **kwargs):
+    # Composite unique constraints for organization-scoped uniqueness
+    __table_args__ = (
+        db.UniqueConstraint('organization_id', 'username', name='_org_username_uc'),
+        db.UniqueConstraint('organization_id', 'email', name='_org_email_uc'),
+    )
+
+    def __init__(self, organization_id, username, email, first_name, last_name, **kwargs):
         # Validate inputs
+        if not organization_id:
+            raise ValueError('Organization ID is required')
         self.validate_username(username)
         self.validate_email(email)
         self.validate_name(first_name, 'First name')
         self.validate_name(last_name, 'Last name')
         
+        self.organization_id = organization_id
         self.username = username.lower().strip()
         self.email = email.lower().strip()
         self.first_name = first_name.strip()
@@ -62,7 +72,8 @@ class User(db.Model):
     def validate_email(email):
         """Validate email format"""
         try:
-            validate_email(email.strip())
+            # Only validate syntax, not deliverability for development
+            validate_email(email.strip(), check_deliverability=False)
         except EmailNotValidError:
             raise ValueError('Invalid email format')
     
@@ -118,6 +129,9 @@ class User(db.Model):
         """Convert user to dictionary"""
         data = {
             'id': self.id,
+            'organization_id': self.organization_id,
+            'organization_code': self.organization.code if self.organization else None,
+            'organization_name': self.organization.name if self.organization else None,
             'username': self.username,
             'email': self.email,
             'first_name': self.first_name,
@@ -136,5 +150,27 @@ class User(db.Model):
             
         return data
     
+    @classmethod
+    def find_by_login_and_organization(cls, organization_id, login):
+        """Find user by email or username within an organization"""
+        return cls.query.filter(
+            cls.organization_id == organization_id,
+            cls.is_active == True,
+            (cls.email == login.lower().strip()) | (cls.username == login.lower().strip())
+        ).first()
+    
+    @classmethod
+    def find_by_email_and_organization(cls, organization_id, email):
+        """Find user by email within an organization"""
+        return cls.query.filter_by(
+            organization_id=organization_id,
+            email=email.lower().strip(),
+            is_active=True
+        ).first()
+    
+    def is_in_organization(self, organization_id):
+        """Check if user belongs to specific organization"""
+        return self.organization_id == organization_id
+
     def __repr__(self):
-        return f'<User {self.username} ({self.role})>'
+        return f'<User {self.username} ({self.role}) - Org {self.organization_id}>'

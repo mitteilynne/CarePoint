@@ -10,7 +10,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
+  login: (organizationCode: string, email: string, password: string) => Promise<void>;
   register: (userData: any) => Promise<void>;
   logout: () => void;
 }
@@ -75,10 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (organizationCode: string, email: string, password: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const response = await authAPI.login({ login: email, password });
+      const response = await authAPI.login({ organization_code: organizationCode, login: email, password });
       localStorage.setItem('token', response.access_token);
       dispatch({
         type: 'SET_USER',

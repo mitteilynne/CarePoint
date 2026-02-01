@@ -3,10 +3,21 @@ import { Link } from 'react-router-dom';
 import { authAPI } from '@/services/api';
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
+  const [formData, setFormData] = useState({
+    organizationCode: '',
+    email: '',
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,8 +25,20 @@ export default function ForgotPassword() {
     setError('');
     setMessage('');
 
+    if (!formData.organizationCode.trim()) {
+      setError('Organization code is required');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      setError('Email address is required');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      await authAPI.forgotPassword(email);
+      await authAPI.forgotPassword(formData.organizationCode, formData.email);
       setMessage('Password reset instructions have been sent to your email address.');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to send reset email');
@@ -37,7 +60,7 @@ export default function ForgotPassword() {
             Reset your password
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your email address and we'll send you a link to reset your password.
+            Enter your organization code and email address to receive password reset instructions.
           </p>
         </div>
 
@@ -54,21 +77,45 @@ export default function ForgotPassword() {
             </div>
           )}
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email address
-            </label>
-            <div className="mt-1">
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200"
-                placeholder="Enter your email address"
-              />
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="organizationCode" className="block text-sm font-medium text-gray-700">
+                Organization Code
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="organizationCode"
+                  name="organizationCode"
+                  type="text"
+                  required
+                  value={formData.organizationCode}
+                  onChange={handleChange}
+                  className="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200"
+                  placeholder="Enter your organization code"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email address
+              </label>
+              <div className="mt-1">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200"
+                  placeholder="Enter your email address"
+                />
+              </div>
             </div>
           </div>
 

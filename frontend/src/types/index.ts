@@ -7,6 +7,9 @@ export interface User {
   role: 'patient' | 'doctor' | 'admin';
   phone?: string;
   address?: string;
+  organization_id: number;
+  organization_code: string;
+  organization_name: string;
   created_at: string;
 }
 
@@ -17,11 +20,13 @@ export interface AuthResponse {
 }
 
 export interface LoginRequest {
+  organization_code: string;
   login: string; // email or username
   password: string;
 }
 
 export interface RegisterRequest {
+  organization_code: string;
   username: string;
   email: string;
   password: string;

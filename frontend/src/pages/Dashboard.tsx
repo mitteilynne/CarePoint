@@ -13,6 +13,15 @@ export default function Dashboard() {
       <div className="px-4 py-6 sm:px-0">
         <div className="border-4 border-dashed border-gray-200 rounded-lg p-8">
           <div className="text-center">
+            <div className="mb-4 p-4 bg-primary-50 rounded-lg border border-primary-200">
+              <h2 className="text-lg font-semibold text-primary-800 mb-1">
+                {user?.organization_name || 'Healthcare Facility'}
+              </h2>
+              <p className="text-sm text-primary-600">
+                Organization Code: {user?.organization_code}
+              </p>
+            </div>
+            
             <h1 className="text-3xl font-bold text-gray-900 mb-4">
               Welcome to your Dashboard, {user?.first_name}!
             </h1>
