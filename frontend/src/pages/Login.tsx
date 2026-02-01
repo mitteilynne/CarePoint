@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import OrganizationCodeInput from '@/components/OrganizationCodeInput';
 
 export default function Login() {
   const [formData, setFormData] = useState({
     organizationCode: '',
+<<<<<<< Updated upstream
     username: '',
+=======
+    login: '',
+>>>>>>> Stashed changes
     password: '',
     rememberMe: false,
   });
@@ -30,6 +35,18 @@ export default function Login() {
     setFormData({
       ...formData,
       [name]: type === 'checkbox' ? checked : value,
+<<<<<<< Updated upstream
+=======
+    });
+  };
+
+  const handleOrganizationCodeChange = (value: string) => {
+    setMessage('');
+    setFieldErrors({});
+    setFormData({
+      ...formData,
+      organizationCode: value,
+>>>>>>> Stashed changes
     });
   };
 
@@ -44,8 +61,13 @@ export default function Login() {
       errors.organizationCode = 'Organization code is required';
     }
 
+<<<<<<< Updated upstream
     if (!formData.username.trim()) {
       errors.username = 'Username is required';
+=======
+    if (!formData.login.trim()) {
+      errors.login = 'Email or username is required';
+>>>>>>> Stashed changes
     }
 
     if (!formData.password) {
@@ -61,7 +83,11 @@ export default function Login() {
     }
 
     try {
+<<<<<<< Updated upstream
       await login(formData.organizationCode, formData.username, formData.password);
+=======
+      await login(formData.organizationCode, formData.login, formData.password);
+>>>>>>> Stashed changes
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed');
@@ -94,6 +120,7 @@ export default function Login() {
           {message && (
             <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
               {message}
+<<<<<<< Updated upstream
             </div>
           )}
           
@@ -149,6 +176,45 @@ export default function Login() {
             </div>
             
             <div>
+=======
+            </div>
+          )}
+          
+          <div className="space-y-4">
+            <OrganizationCodeInput
+              value={formData.organizationCode}
+              onChange={handleOrganizationCodeChange}
+              error={fieldErrors.organizationCode}
+              placeholder="e.g. HOSP001, CLINIC123"
+            />
+            
+            <div>
+              <label htmlFor="login" className="block text-sm font-medium text-gray-700">
+                Email or Username
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="login"
+                  name="login"
+                  type="text"
+                  required
+                  className={`appearance-none relative block w-full px-4 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 transition duration-200 ${
+                    fieldErrors.login
+                      ? 'border-red-300 focus:ring-red-500 focus:border-transparent'
+                      : 'border-gray-300 focus:ring-primary-500 focus:border-transparent'
+                  }`}
+                  placeholder="Enter your email or username"
+                  value={formData.login}
+                  onChange={handleChange}
+                />
+              </div>
+              {fieldErrors.login && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.login}</p>
+              )}
+            </div>
+            
+            <div>
+>>>>>>> Stashed changes
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>

@@ -10,7 +10,11 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
+<<<<<<< Updated upstream
   login: (organizationCode: string, username: string, password: string) => Promise<void>;
+=======
+  login: (organizationCode: string, email: string, password: string) => Promise<void>;
+>>>>>>> Stashed changes
   register: (userData: any) => Promise<void>;
   logout: () => void;
 }
@@ -75,10 +79,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+<<<<<<< Updated upstream
   const login = async (organizationCode: string, username: string, password: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const response = await authAPI.login({ organization_code: organizationCode, username, password });
+=======
+  const login = async (organizationCode: string, email: string, password: string) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      const response = await authAPI.login({ organization_code: organizationCode, login: email, password });
+>>>>>>> Stashed changes
       localStorage.setItem('token', response.access_token);
       dispatch({
         type: 'SET_USER',

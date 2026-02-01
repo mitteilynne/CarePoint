@@ -21,7 +21,11 @@ export interface AuthResponse {
 
 export interface LoginRequest {
   organization_code: string;
+<<<<<<< Updated upstream
   username: string;
+=======
+  login: string; // email or username
+>>>>>>> Stashed changes
   password: string;
 }
 
