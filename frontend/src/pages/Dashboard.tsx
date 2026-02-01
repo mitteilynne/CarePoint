@@ -1,11 +1,17 @@
 import { useAuth } from '@/context/AuthContext';
 import { Navigate } from 'react-router-dom';
+import ReceptionistDashboard from './ReceptionistDashboard';
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Route to specific dashboard based on user role
+  if (user?.role === 'receptionist') {
+    return <ReceptionistDashboard />;
   }
 
   return (
