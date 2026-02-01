@@ -20,8 +20,9 @@ def create_app(config_name='default'):
     CORS(app)
     
     # Register blueprints
-    from app.routes import auth, main
-    app.register_blueprint(auth.bp)
-    app.register_blueprint(main.bp)
+    from app.routes.auth import auth_bp
+    from app.routes.users import user_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(user_bp, url_prefix='/api')
     
     return app
