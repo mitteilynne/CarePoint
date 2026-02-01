@@ -21,7 +21,7 @@ export interface AuthResponse {
 
 export interface LoginRequest {
   organization_code: string;
-  login: string; // email or username
+  username: string;
   password: string;
 }
 

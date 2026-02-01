@@ -1,6 +1,7 @@
 import { useAuth } from '@/context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import ReceptionistDashboard from './ReceptionistDashboard';
+import DoctorDashboard from './DoctorDashboard';
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -12,6 +13,10 @@ export default function Dashboard() {
   // Route to specific dashboard based on user role
   if (user?.role === 'receptionist') {
     return <ReceptionistDashboard />;
+  }
+  
+  if (user?.role === 'doctor') {
+    return <DoctorDashboard />;
   }
 
   return (

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import OrganizationCodeInput from '@/components/OrganizationCodeInput';
 
 export default function Login() {
   const [formData, setFormData] = useState({
     organizationCode: '',
-    login: '',
+    username: '',
     password: '',
     rememberMe: false,
   });
@@ -34,15 +33,6 @@ export default function Login() {
     });
   };
 
-  const handleOrganizationCodeChange = (value: string) => {
-    setMessage('');
-    setFieldErrors({});
-    setFormData({
-      ...formData,
-      organizationCode: value,
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -54,8 +44,8 @@ export default function Login() {
       errors.organizationCode = 'Organization code is required';
     }
 
-    if (!formData.login.trim()) {
-      errors.login = 'Email or username is required';
+    if (!formData.username.trim()) {
+      errors.username = 'Username is required';
     }
 
     if (!formData.password) {
@@ -71,7 +61,7 @@ export default function Login() {
     }
 
     try {
-      await login(formData.organizationCode, formData.login, formData.password);
+      await login(formData.organizationCode, formData.username, formData.password);
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed');
@@ -108,35 +98,53 @@ export default function Login() {
           )}
           
           <div className="space-y-4">
-            <OrganizationCodeInput
-              value={formData.organizationCode}
-              onChange={handleOrganizationCodeChange}
-              error={fieldErrors.organizationCode}
-              placeholder="e.g. HOSP001, CLINIC123"
-            />
-            
             <div>
-              <label htmlFor="login" className="block text-sm font-medium text-gray-700">
-                Email or Username
+              <label htmlFor="organizationCode" className="block text-sm font-medium text-gray-700">
+                Organization Code
               </label>
               <div className="mt-1 relative">
                 <input
-                  id="login"
-                  name="login"
+                  id="organizationCode"
+                  name="organizationCode"
                   type="text"
                   required
                   className={`appearance-none relative block w-full px-4 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 transition duration-200 ${
-                    fieldErrors.login
+                    fieldErrors.organizationCode
                       ? 'border-red-300 focus:ring-red-500 focus:border-transparent'
                       : 'border-gray-300 focus:ring-primary-500 focus:border-transparent'
                   }`}
-                  placeholder="Enter your email or username"
-                  value={formData.login}
+                  placeholder="Enter organization code"
+                  value={formData.organizationCode}
                   onChange={handleChange}
                 />
               </div>
-              {fieldErrors.login && (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.login}</p>
+              {fieldErrors.organizationCode && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.organizationCode}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+                Username
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  className={`appearance-none relative block w-full px-4 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 transition duration-200 ${
+                    fieldErrors.username
+                      ? 'border-red-300 focus:ring-red-500 focus:border-transparent'
+                      : 'border-gray-300 focus:ring-primary-500 focus:border-transparent'
+                  }`}
+                  placeholder="Enter your username"
+                  value={formData.username}
+                  onChange={handleChange}
+                />
+              </div>
+              {fieldErrors.username && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.username}</p>
               )}
             </div>
             
