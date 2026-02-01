@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { createContext, useContext, useReducer, useEffect } from 'react';
 import { User } from '@/types';
 import { authAPI } from '@/services/api';
 
@@ -10,7 +10,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
+  login: (organizationCode: string, username: string, password: string) => Promise<void>;
   register: (userData: any) => Promise<void>;
   logout: () => void;
 }
@@ -75,10 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (organizationCode: string, username: string, password: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const response = await authAPI.login({ login: email, password });
+      const response = await authAPI.login({ organization_code: organizationCode, username, password });
       localStorage.setItem('token', response.access_token);
       dispatch({
         type: 'SET_USER',

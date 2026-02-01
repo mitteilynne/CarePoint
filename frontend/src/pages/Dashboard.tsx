@@ -1,6 +1,7 @@
-import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Navigate } from 'react-router-dom';
+import ReceptionistDashboard from './ReceptionistDashboard';
+import DoctorDashboard from './DoctorDashboard';
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -9,11 +10,29 @@ export default function Dashboard() {
     return <Navigate to="/login" replace />;
   }
 
+  // Route to specific dashboard based on user role
+  if (user?.role === 'receptionist') {
+    return <ReceptionistDashboard />;
+  }
+  
+  if (user?.role === 'doctor') {
+    return <DoctorDashboard />;
+  }
+
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <div className="px-4 py-6 sm:px-0">
         <div className="border-4 border-dashed border-gray-200 rounded-lg p-8">
           <div className="text-center">
+            <div className="mb-4 p-4 bg-primary-50 rounded-lg border border-primary-200">
+              <h2 className="text-lg font-semibold text-primary-800 mb-1">
+                {user?.organization_name || 'Healthcare Facility'}
+              </h2>
+              <p className="text-sm text-primary-600">
+                Organization Code: {user?.organization_code}
+              </p>
+            </div>
+            
             <h1 className="text-3xl font-bold text-gray-900 mb-4">
               Welcome to your Dashboard, {user?.first_name}!
             </h1>

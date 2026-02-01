@@ -1,19 +1,18 @@
 from app import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-from email_validator import validate_email, EmailNotValidError
-import re
 
 class User(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    username = db.Column(db.String(80), nullable=False, index=True)
+    email = db.Column(db.String(120), nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
-    role = db.Column(db.Enum('patient', 'doctor', 'admin', name='user_roles'), 
+    role = db.Column(db.Enum('patient', 'doctor', 'admin', 'receptionist', 'nurse', 'pharmacist', 'lab', name='user_roles'),
                      nullable=False, default='patient')
     phone = db.Column(db.String(20))
     address = db.Column(db.Text)
@@ -23,105 +22,59 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, 
                           onupdate=datetime.utcnow, nullable=False)
     
-    def __init__(self, username, email, first_name, last_name, **kwargs):
+    # Composite unique constraints for organization-scoped uniqueness
+    __table_args__ = (
+        db.UniqueConstraint('organization_id', 'username', name='_org_username_uc'),
+        db.UniqueConstraint('organization_id', 'email', name='_org_email_uc'),
+    )
+
+    def __init__(self, organization_id, username, email, first_name, last_name, **kwargs):
         # Validate inputs
-        self.validate_username(username)
-        self.validate_email(email)
-        self.validate_name(first_name, 'First name')
-        self.validate_name(last_name, 'Last name')
+        if not all([organization_id, username, email, first_name, last_name]):
+            raise ValueError("All required fields must be provided")
         
-        self.username = username.lower().strip()
-        self.email = email.lower().strip()
-        self.first_name = first_name.strip()
-        self.last_name = last_name.strip()
-        self.role = kwargs.get('role', 'patient')
-        self.phone = kwargs.get('phone')
-        self.address = kwargs.get('address')
-        self.is_active = kwargs.get('is_active', True)
-    
+        # Strip whitespace and normalize
+        self.organization_id = organization_id
+        self.username = username.lower().strip() if username else None
+        self.email = email.lower().strip() if email else None
+        self.first_name = first_name.strip() if first_name else None
+        self.last_name = last_name.strip() if last_name else None
+        
+        # Set optional fields
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
     def set_password(self, password):
-        """Set password with validation"""
-        self.validate_password(password)
+        """Hash and store password"""
+        if not password:
+            raise ValueError("Password cannot be empty")
+        if len(password) < 6:
+            raise ValueError("Password must be at least 6 characters long")
+        
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
-        """Check if provided password matches hash"""
+        """Check if provided password matches the stored password hash"""
+        if not password:
+            return False
         return check_password_hash(self.password_hash, password)
-    
-    @staticmethod
-    def validate_username(username):
-        """Validate username format"""
-        if not username or len(username.strip()) < 3:
-            raise ValueError('Username must be at least 3 characters long')
-        if len(username.strip()) > 80:
-            raise ValueError('Username must not exceed 80 characters')
-        if not re.match(r'^[a-zA-Z0-9_]+$', username.strip()):
-            raise ValueError('Username can only contain letters, numbers, and underscores')
-    
-    @staticmethod
-    def validate_email(email):
-        """Validate email format"""
-        try:
-            validate_email(email.strip())
-        except EmailNotValidError:
-            raise ValueError('Invalid email format')
-    
-    @staticmethod
-    def validate_name(name, field_name):
-        """Validate first/last name"""
-        if not name or len(name.strip()) < 2:
-            raise ValueError(f'{field_name} must be at least 2 characters long')
-        if len(name.strip()) > 50:
-            raise ValueError(f'{field_name} must not exceed 50 characters')
-        if not re.match(r'^[a-zA-Z\s\-\']+$', name.strip()):
-            raise ValueError(f'{field_name} can only contain letters, spaces, hyphens, and apostrophes')
-    
-    @staticmethod
-    def validate_password(password):
-        """Validate password strength"""
-        if len(password) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if len(password) > 128:
-            raise ValueError('Password must not exceed 128 characters')
-        if not re.search(r'[A-Z]', password):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not re.search(r'[a-z]', password):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not re.search(r'\d', password):
-            raise ValueError('Password must contain at least one number')
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-            raise ValueError('Password must contain at least one special character')
-    
-    def validate_role(self, role):
-        """Validate user role"""
-        valid_roles = ['patient', 'doctor', 'admin']
-        if role not in valid_roles:
-            raise ValueError(f'Invalid role. Must be one of: {", ".join(valid_roles)}')
-    
-    def has_role(self, role):
-        """Check if user has specific role"""
-        return self.role == role
-    
-    def has_permission(self, permission):
-        """Check if user has specific permission based on role"""
-        role_permissions = {
-            'patient': ['view_own_data', 'update_own_profile'],
-            'doctor': ['view_own_data', 'update_own_profile', 'view_patient_data', 
-                      'create_appointment', 'view_appointments'],
-            'admin': ['view_own_data', 'update_own_profile', 'view_patient_data', 
-                     'create_appointment', 'view_appointments', 'manage_users', 
-                     'view_all_data', 'system_admin']
-        }
-        return permission in role_permissions.get(self.role, [])
-    
+
+    @property
+    def full_name(self):
+        """Return full name"""
+        return f"{self.first_name} {self.last_name}".strip()
+
     def to_dict(self, include_sensitive=False):
-        """Convert user to dictionary"""
-        data = {
+        """Convert user to dictionary representation"""
+        user_dict = {
             'id': self.id,
+            'organization_id': self.organization_id,
             'username': self.username,
             'email': self.email,
             'first_name': self.first_name,
             'last_name': self.last_name,
+            'full_name': self.full_name,
             'role': self.role,
             'phone': self.phone,
             'address': self.address,
@@ -131,10 +84,87 @@ class User(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
         
+        # Include organization details if available
+        if hasattr(self, 'organization') and self.organization:
+            user_dict.update({
+                'organization_code': self.organization.code,
+                'organization_name': self.organization.name
+            })
+        
         if include_sensitive:
-            data['password_hash'] = self.password_hash
-            
-        return data
-    
+            user_dict['password_hash'] = self.password_hash
+        
+        return user_dict
+
+    def can_access_role(self, required_role):
+        """Check if user can access a specific role"""
+        role_hierarchy = {
+            'admin': 5,
+            'doctor': 4,
+            'nurse': 3,
+            'receptionist': 2,
+            'patient': 1
+        }
+        
+        user_level = role_hierarchy.get(self.role, 0)
+        required_level = role_hierarchy.get(required_role, 0)
+        
+        return user_level >= required_level
+
+    def update_profile(self, **kwargs):
+        """Update user profile with new data"""
+        allowed_fields = {
+            'first_name', 'last_name', 'phone', 'address', 'email'
+        }
+        
+        for key, value in kwargs.items():
+            if key in allowed_fields and hasattr(self, key):
+                if key in ['first_name', 'last_name', 'email'] and value:
+                    setattr(self, key, value.strip())
+                else:
+                    setattr(self, key, value)
+        
+        self.updated_at = datetime.utcnow()
+
+    @classmethod
+    def find_by_username(cls, username, organization_id=None):
+        """Find user by username, optionally scoped to organization"""
+        query = cls.query.filter_by(username=username.lower().strip())
+        if organization_id:
+            query = query.filter_by(organization_id=organization_id)
+        return query.first()
+
+    @classmethod
+    def find_by_email(cls, email, organization_id=None):
+        """Find user by email, optionally scoped to organization"""
+        query = cls.query.filter_by(email=email.lower().strip())
+        if organization_id:
+            query = query.filter_by(organization_id=organization_id)
+        return query.first()
+
+    @classmethod
+    def find_by_credentials(cls, login, organization_id):
+        """Find user by username or email within organization"""
+        login_clean = login.lower().strip()
+        return cls.query.filter(
+            cls.organization_id == organization_id,
+            (cls.username == login_clean) | (cls.email == login_clean)
+        ).first()
+
+    def deactivate(self):
+        """Deactivate user account"""
+        self.is_active = False
+        self.updated_at = datetime.utcnow()
+
+    def activate(self):
+        """Activate user account"""
+        self.is_active = True
+        self.updated_at = datetime.utcnow()
+
+    def confirm_email(self):
+        """Confirm user's email address"""
+        self.email_confirmed = True
+        self.updated_at = datetime.utcnow()
+
     def __repr__(self):
-        return f'<User {self.username} ({self.role})>'
+        return f'<User {self.username}@{self.organization_id}>'
