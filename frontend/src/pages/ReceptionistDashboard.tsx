@@ -207,7 +207,7 @@ export default function NewReceptionistDashboard() {
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Receptionist Dashboard</h2>
         
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <button
             onClick={() => setCurrentView('register')}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2 transition-colors"
@@ -215,7 +215,7 @@ export default function NewReceptionistDashboard() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            <span>Register New Patient</span>
+            <span>Register Patient</span>
           </button>
           
           <button
@@ -226,6 +226,22 @@ export default function NewReceptionistDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <span>Search Patients</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              if (patients.length === 0) {
+                showMessage('error', 'No patients available for triage');
+                return;
+              }
+              setCurrentView('triage');
+            }}
+            className="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 flex items-center justify-center space-x-2 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Triage Assessment</span>
           </button>
           
           <button
@@ -661,7 +677,11 @@ export default function NewReceptionistDashboard() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Triage Assessment</h2>
-            <p className="text-gray-600">Patient: {selectedPatient?.first_name} {selectedPatient?.last_name} ({selectedPatient?.patient_id})</p>
+            {selectedPatient ? (
+              <p className="text-gray-600">Patient: {selectedPatient.first_name} {selectedPatient.last_name} ({selectedPatient.patient_id})</p>
+            ) : (
+              <p className="text-gray-600">Select a patient to begin triage assessment</p>
+            )}
           </div>
           <button
             onClick={() => {
@@ -674,200 +694,348 @@ export default function NewReceptionistDashboard() {
           </button>
         </div>
 
-        <form onSubmit={handleTriageSubmission} className="space-y-6">
-          {/* Chief Complaint */}
-          <div>
-            <label htmlFor="chief_complaint" className="block text-sm font-medium text-gray-700 mb-1">
-              Chief Complaint *
-            </label>
-            <textarea
-              id="chief_complaint"
-              value={triageData.chief_complaint}
-              onChange={(e) => setTriageData({...triageData, chief_complaint: e.target.value})}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-
-          {/* Pain Scale */}
-          <div>
-            <label htmlFor="pain_scale" className="block text-sm font-medium text-gray-700 mb-1">
-              Pain Scale (0-10)
-            </label>
-            <input
-              type="range"
-              id="pain_scale"
-              min="0"
-              max="10"
-              value={triageData.pain_scale}
-              onChange={(e) => setTriageData({...triageData, pain_scale: parseInt(e.target.value)})}
-              className="w-full"
-            />
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>0 (No pain)</span>
-              <span className="font-medium">{triageData.pain_scale}</span>
-              <span>10 (Worst pain)</span>
+        {/* Patient Selection (if no patient selected) */}
+        {!selectedPatient && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Patient for Triage</h3>
+            <div className="grid gap-3">
+              {patients.filter(p => p.registration_status === 'registered').map((patient) => (
+                <div
+                  key={patient.id}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                  onClick={() => setSelectedPatient(patient)}
+                >
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                      <span className="text-sm font-medium text-blue-600">
+                        {patient.first_name[0]}{patient.last_name[0]}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {patient.first_name} {patient.last_name}
+                      </div>
+                      <div className="text-sm text-gray-500">{patient.patient_id} • {patient.phone}</div>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 text-xs rounded-full ${
+                    patient.visit_type === 'emergency' ? 'bg-red-100 text-red-800' :
+                    patient.visit_type === 'appointment' ? 'bg-blue-100 text-blue-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {patient.visit_type?.toUpperCase() || 'WALK-IN'}
+                  </span>
+                </div>
+              ))}
+              {patients.filter(p => p.registration_status === 'registered').length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No patients available for triage</p>
+                  <button
+                    onClick={() => setCurrentView('register')}
+                    className="mt-2 text-blue-600 hover:text-blue-800"
+                  >
+                    Register a new patient
+                  </button>
+                </div>
+              )}
             </div>
           </div>
+        )}
 
-          {/* Vital Signs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Triage Form */}
+        {selectedPatient && (
+          <form onSubmit={handleTriageSubmission} className="space-y-6">
+            {/* Chief Complaint */}
             <div>
-              <label htmlFor="temperature" className="block text-sm font-medium text-gray-700 mb-1">
-                Temperature (°C)
+              <label htmlFor="chief_complaint" className="block text-sm font-medium text-gray-700 mb-1">
+                Chief Complaint *
               </label>
-              <input
-                type="number"
-                step="0.1"
-                id="temperature"
-                value={triageData.temperature || ''}
-                onChange={(e) => setTriageData({...triageData, temperature: e.target.value ? parseFloat(e.target.value) : undefined})}
+              <textarea
+                id="chief_complaint"
+                value={triageData.chief_complaint}
+                onChange={(e) => setTriageData({...triageData, chief_complaint: e.target.value})}
+                rows={3}
+                placeholder="What is the main reason for today's visit?"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+
+            {/* Pain Scale */}
+            <div>
+              <label htmlFor="pain_scale" className="block text-sm font-medium text-gray-700 mb-1">
+                Pain Scale (0-10) *
+              </label>
+              <div className="space-y-2">
+                <input
+                  type="range"
+                  id="pain_scale"
+                  min="0"
+                  max="10"
+                  value={triageData.pain_scale}
+                  onChange={(e) => setTriageData({...triageData, pain_scale: parseInt(e.target.value)})}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>0 (No pain)</span>
+                  <span className="font-medium text-lg">{triageData.pain_scale}</span>
+                  <span>10 (Worst pain)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Vital Signs */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label htmlFor="temperature" className="block text-sm font-medium text-gray-700 mb-1">
+                  Temperature (°C)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  id="temperature"
+                  value={triageData.temperature || ''}
+                  onChange={(e) => setTriageData({...triageData, temperature: e.target.value ? parseFloat(e.target.value) : undefined})}
+                  placeholder="36.5"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="heart_rate" className="block text-sm font-medium text-gray-700 mb-1">
+                  Heart Rate (bpm)
+                </label>
+                <input
+                  type="number"
+                  id="heart_rate"
+                  value={triageData.heart_rate || ''}
+                  onChange={(e) => setTriageData({...triageData, heart_rate: e.target.value ? parseInt(e.target.value) : undefined})}
+                  placeholder="80"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="oxygen_saturation" className="block text-sm font-medium text-gray-700 mb-1">
+                  Oxygen Saturation (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  id="oxygen_saturation"
+                  value={triageData.oxygen_saturation || ''}
+                  onChange={(e) => setTriageData({...triageData, oxygen_saturation: e.target.value ? parseInt(e.target.value) : undefined})}
+                  placeholder="98"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Blood Pressure */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label htmlFor="bp_systolic" className="block text-sm font-medium text-gray-700 mb-1">
+                  Blood Pressure Systolic (mmHg)
+                </label>
+                <input
+                  type="number"
+                  id="bp_systolic"
+                  value={triageData.blood_pressure_systolic || ''}
+                  onChange={(e) => setTriageData({...triageData, blood_pressure_systolic: e.target.value ? parseInt(e.target.value) : undefined})}
+                  placeholder="120"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="bp_diastolic" className="block text-sm font-medium text-gray-700 mb-1">
+                  Blood Pressure Diastolic (mmHg)
+                </label>
+                <input
+                  type="number"
+                  id="bp_diastolic"
+                  value={triageData.blood_pressure_diastolic || ''}
+                  onChange={(e) => setTriageData({...triageData, blood_pressure_diastolic: e.target.value ? parseInt(e.target.value) : undefined})}
+                  placeholder="80"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="respiratory_rate" className="block text-sm font-medium text-gray-700 mb-1">
+                  Respiratory Rate (breaths/min)
+                </label>
+                <input
+                  type="number"
+                  id="respiratory_rate"
+                  value={triageData.respiratory_rate || ''}
+                  onChange={(e) => setTriageData({...triageData, respiratory_rate: e.target.value ? parseInt(e.target.value) : undefined})}
+                  placeholder="16"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Physical Measurements */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1">
+                  Weight (kg)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  id="weight"
+                  value={triageData.weight || ''}
+                  onChange={(e) => setTriageData({...triageData, weight: e.target.value ? parseFloat(e.target.value) : undefined})}
+                  placeholder="70.0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="height" className="block text-sm font-medium text-gray-700 mb-1">
+                  Height (cm)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  id="height"
+                  value={triageData.height || ''}
+                  onChange={(e) => setTriageData({...triageData, height: e.target.value ? parseFloat(e.target.value) : undefined})}
+                  placeholder="175.0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Symptoms */}
+            <div>
+              <label htmlFor="symptoms" className="block text-sm font-medium text-gray-700 mb-1">
+                Additional Symptoms
+              </label>
+              <textarea
+                id="symptoms"
+                value={triageData.symptoms}
+                onChange={(e) => setTriageData({...triageData, symptoms: e.target.value})}
+                rows={3}
+                placeholder="List any other symptoms the patient is experiencing..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
+            {/* Medical History */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="allergies_noted" className="block text-sm font-medium text-gray-700 mb-1">
+                  Known Allergies
+                </label>
+                <input
+                  type="text"
+                  id="allergies_noted"
+                  value={triageData.allergies_noted}
+                  onChange={(e) => setTriageData({...triageData, allergies_noted: e.target.value})}
+                  placeholder="e.g., Penicillin, Nuts, None known"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="mobility_status" className="block text-sm font-medium text-gray-700 mb-1">
+                  Mobility Status
+                </label>
+                <select
+                  id="mobility_status"
+                  value={triageData.mobility_status}
+                  onChange={(e) => setTriageData({...triageData, mobility_status: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="ambulatory">Ambulatory (Walking)</option>
+                  <option value="wheelchair">Wheelchair</option>
+                  <option value="stretcher">Stretcher</option>
+                  <option value="assisted">Assisted Walking</option>
+                  <option value="bedbound">Bedbound</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Current Medications */}
             <div>
-              <label htmlFor="heart_rate" className="block text-sm font-medium text-gray-700 mb-1">
-                Heart Rate (bpm)
+              <label htmlFor="current_medications" className="block text-sm font-medium text-gray-700 mb-1">
+                Current Medications
               </label>
-              <input
-                type="number"
-                id="heart_rate"
-                value={triageData.heart_rate || ''}
-                onChange={(e) => setTriageData({...triageData, heart_rate: e.target.value ? parseInt(e.target.value) : undefined})}
+              <textarea
+                id="current_medications"
+                value={triageData.current_medications_noted}
+                onChange={(e) => setTriageData({...triageData, current_medications_noted: e.target.value})}
+                rows={2}
+                placeholder="List current medications, dosages, and frequency..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
+            {/* Triage Level */}
             <div>
-              <label htmlFor="oxygen_saturation" className="block text-sm font-medium text-gray-700 mb-1">
-                Oxygen Saturation (%)
+              <label htmlFor="triage_level" className="block text-sm font-medium text-gray-700 mb-1">
+                Triage Level *
               </label>
-              <input
-                type="number"
-                id="oxygen_saturation"
-                value={triageData.oxygen_saturation || ''}
-                onChange={(e) => setTriageData({...triageData, oxygen_saturation: e.target.value ? parseInt(e.target.value) : undefined})}
+              <select
+                id="triage_level"
+                value={triageData.triage_level}
+                onChange={(e) => setTriageData({...triageData, triage_level: e.target.value as 'emergency' | 'urgent' | 'less_urgent' | 'non_urgent'})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="emergency">🔴 Emergency (Immediate attention required)</option>
+                <option value="urgent">🟠 Urgent (Should be seen within 1 hour)</option>
+                <option value="less_urgent">🟡 Less Urgent (Can wait 2-4 hours)</option>
+                <option value="non_urgent">🟢 Non-Urgent (Can wait several hours)</option>
+              </select>
+            </div>
+
+            {/* Special Requirements */}
+            <div>
+              <label htmlFor="special_requirements" className="block text-sm font-medium text-gray-700 mb-1">
+                Special Requirements
+              </label>
+              <textarea
+                id="special_requirements"
+                value={triageData.special_requirements}
+                onChange={(e) => setTriageData({...triageData, special_requirements: e.target.value})}
+                rows={2}
+                placeholder="Any special accommodations needed (interpreter, wheelchair access, etc.)"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-          </div>
 
-          {/* Blood Pressure */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Receptionist Notes */}
             <div>
-              <label htmlFor="bp_systolic" className="block text-sm font-medium text-gray-700 mb-1">
-                Blood Pressure Systolic (mmHg)
+              <label htmlFor="receptionist_notes" className="block text-sm font-medium text-gray-700 mb-1">
+                Receptionist Notes
               </label>
-              <input
-                type="number"
-                id="bp_systolic"
-                value={triageData.blood_pressure_systolic || ''}
-                onChange={(e) => setTriageData({...triageData, blood_pressure_systolic: e.target.value ? parseInt(e.target.value) : undefined})}
+              <textarea
+                id="receptionist_notes"
+                value={triageData.receptionist_notes}
+                onChange={(e) => setTriageData({...triageData, receptionist_notes: e.target.value})}
+                rows={3}
+                placeholder="Additional observations or notes..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
-            <div>
-              <label htmlFor="bp_diastolic" className="block text-sm font-medium text-gray-700 mb-1">
-                Blood Pressure Diastolic (mmHg)
-              </label>
-              <input
-                type="number"
-                id="bp_diastolic"
-                value={triageData.blood_pressure_diastolic || ''}
-                onChange={(e) => setTriageData({...triageData, blood_pressure_diastolic: e.target.value ? parseInt(e.target.value) : undefined})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? 'Submitting...' : 'Complete Triage & Assign Queue Number'}
+              </button>
             </div>
-          </div>
-
-          {/* Symptoms */}
-          <div>
-            <label htmlFor="symptoms" className="block text-sm font-medium text-gray-700 mb-1">
-              Additional Symptoms
-            </label>
-            <textarea
-              id="symptoms"
-              value={triageData.symptoms}
-              onChange={(e) => setTriageData({...triageData, symptoms: e.target.value})}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          {/* Allergies */}
-          <div>
-            <label htmlFor="allergies_noted" className="block text-sm font-medium text-gray-700 mb-1">
-              Known Allergies
-            </label>
-            <input
-              type="text"
-              id="allergies_noted"
-              value={triageData.allergies_noted}
-              onChange={(e) => setTriageData({...triageData, allergies_noted: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          {/* Current Medications */}
-          <div>
-            <label htmlFor="current_medications" className="block text-sm font-medium text-gray-700 mb-1">
-              Current Medications
-            </label>
-            <textarea
-              id="current_medications"
-              value={triageData.current_medications_noted}
-              onChange={(e) => setTriageData({...triageData, current_medications_noted: e.target.value})}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          {/* Triage Level */}
-          <div>
-            <label htmlFor="triage_level" className="block text-sm font-medium text-gray-700 mb-1">
-              Triage Level
-            </label>
-            <select
-              id="triage_level"
-              value={triageData.triage_level}
-              onChange={(e) => setTriageData({...triageData, triage_level: e.target.value as 'emergency' | 'urgent' | 'less_urgent' | 'non_urgent'})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="emergency">Emergency (Red)</option>
-              <option value="urgent">Urgent (Orange)</option>
-              <option value="less_urgent">Less Urgent (Yellow)</option>
-              <option value="non_urgent">Non-Urgent (Green)</option>
-            </select>
-          </div>
-
-          {/* Receptionist Notes */}
-          <div>
-            <label htmlFor="receptionist_notes" className="block text-sm font-medium text-gray-700 mb-1">
-              Receptionist Notes
-            </label>
-            <textarea
-              id="receptionist_notes"
-              value={triageData.receptionist_notes}
-              onChange={(e) => setTriageData({...triageData, receptionist_notes: e.target.value})}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {loading ? 'Submitting...' : 'Complete Triage'}
-            </button>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
     </div>
   );
