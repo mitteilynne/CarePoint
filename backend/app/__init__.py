@@ -23,9 +23,11 @@ def create_app(config_name='default'):
     from app.routes.auth import bp as auth_bp
     from app.routes.main import bp as main_bp
     from app.routes.organization import bp as organization_bp
+    from app.routes.healthcare import bp as healthcare_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(organization_bp)
+    app.register_blueprint(healthcare_bp)
     
     return app

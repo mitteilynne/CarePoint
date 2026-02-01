@@ -1,12 +1,21 @@
 import os
 from app import create_app, db
-from app.models import User, Organization, PasswordReset
+from app.models import User, Organization, PasswordReset, Patient, Department, Appointment, MedicalRecord
 
 app = create_app(os.getenv('FLASK_CONFIG', 'default'))
 
 @app.shell_context_processor
 def make_shell_context():
-    return {'db': db, 'User': User, 'Organization': Organization, 'PasswordReset': PasswordReset}
+    return {
+        'db': db, 
+        'User': User, 
+        'Organization': Organization, 
+        'PasswordReset': PasswordReset,
+        'Patient': Patient,
+        'Department': Department,
+        'Appointment': Appointment,
+        'MedicalRecord': MedicalRecord
+    }
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
