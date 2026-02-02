@@ -21,11 +21,7 @@ export interface AuthResponse {
 
 export interface LoginRequest {
   organization_code: string;
-<<<<<<< Updated upstream
   username: string;
-=======
-  login: string; // email or username
->>>>>>> Stashed changes
   password: string;
 }
 
@@ -116,6 +112,94 @@ export interface QueueStatus {
     arrival_time: string;
     wait_time_minutes: number;
   }>;
+}
+
+export interface LabTest {
+  id?: number;
+  patient_id: number;
+  doctor_id: number;
+  test_type: 'blood_chemistry' | 'hematology' | 'urinalysis' | 'microbiology' | 'immunology' | 'toxicology' | 'pathology' | 'radiology' | 'other';
+  test_name: string;
+  test_code?: string;
+  clinical_notes?: string;
+  urgency: 'routine' | 'urgent' | 'stat';
+  sample_type?: string;
+  status: 'ordered' | 'sample_collected' | 'in_progress' | 'completed' | 'cancelled' | 'rejected';
+  ordered_at: string;
+  scheduled_for?: string;
+  sample_collected_at?: string;
+  completed_at?: string;
+  result_value?: string;
+  reference_range?: string;
+  units?: string;
+  abnormal_flag?: 'normal' | 'high' | 'low' | 'critical';
+  result_notes?: string;
+  lab_location?: string;
+  patient_name?: string;
+  doctor_name?: string;
+}
+
+export interface LabTestRequest {
+  patient_id: number;
+  test_type: LabTest['test_type'];
+  test_name: string;
+  test_code?: string;
+  clinical_notes?: string;
+  urgency?: LabTest['urgency'];
+  sample_type?: string;
+  scheduled_for?: string;
+  lab_location?: string;
+}
+
+export interface MedicalRecord {
+  id?: number;
+  patient_id: number;
+  doctor_id: number;
+  appointment_id?: number;
+  visit_date: string;
+  chief_complaint?: string;
+  diagnosis?: string;
+  treatment_plan?: string;
+  medications_prescribed?: string;
+  lab_tests_ordered?: string;
+  follow_up_instructions?: string;
+  blood_pressure?: string;
+  heart_rate?: number;
+  temperature?: number;
+  weight?: number;
+  height?: number;
+  doctor_name?: string;
+  patient_name?: string;
+  lab_test_id?: number;
+  referral_type?: 'none' | 'internal' | 'external';
+  referral_doctor_id?: number;
+  referral_department_id?: number;
+  referral_facility?: string;
+  referral_reason?: string;
+  referral_urgency?: 'routine' | 'urgent' | 'emergency';
+}
+
+export interface Referral {
+  id?: number;
+  medical_record_id: number;
+  patient_id: number;
+  referring_doctor_id: number;
+  referral_type: 'internal' | 'external';
+  // Internal referral fields
+  referred_doctor_id?: number;
+  department_id?: number;
+  // External referral fields
+  facility_name?: string;
+  facility_type?: string;
+  facility_contact?: string;
+  facility_address?: string;
+  // Common fields
+  reason: string;
+  urgency: 'routine' | 'urgent' | 'emergency';
+  status: 'pending' | 'accepted' | 'completed' | 'cancelled';
+  notes?: string;
+  created_at?: string;
+  scheduled_date?: string;
 }
 
 export interface ApiError {

@@ -1,3 +1,5 @@
 from .user import User
+from .organization import Organization, PasswordReset
+from .healthcare import Patient, Department, Appointment, MedicalRecord, Triage, QueueManagement, LabTest, Referral
 
-__all__ = ['User']
+__all__ = ['User', 'Organization', 'PasswordReset', 'Patient', 'Department', 'Appointment', 'MedicalRecord', 'Triage', 'QueueManagement', 'LabTest', 'Referral']
