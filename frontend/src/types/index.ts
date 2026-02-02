@@ -4,7 +4,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'patient' | 'doctor' | 'admin' | 'receptionist' | 'nurse';
+  role: 'patient' | 'doctor' | 'admin' | 'receptionist' | 'nurse' | 'lab_technician';
   phone?: string;
   address?: string;
   organization_id: number;
@@ -32,7 +32,7 @@ export interface RegisterRequest {
   password: string;
   first_name: string;
   last_name: string;
-  role?: 'patient' | 'doctor' | 'admin' | 'receptionist' | 'nurse';
+  role?: 'patient' | 'doctor' | 'admin' | 'receptionist' | 'nurse' | 'lab_technician';
   phone?: string;
   address?: string;
 }
