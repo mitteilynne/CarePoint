@@ -221,6 +221,9 @@ def create_medical_record():
     """Create a new medical record (automatically scoped to current organization)"""
     try:
         data = request.get_json()
+        claims = get_jwt()
+        current_user_id = claims.get('user_id')
+        org_id = claims.get('organization_id')
         
         # Convert visit_date string to datetime object if provided
         if 'visit_date' in data and data['visit_date']:
@@ -228,13 +231,29 @@ def create_medical_record():
         else:
             data['visit_date'] = datetime.utcnow()
         
+        # Ensure organization and doctor are set
+        data['organization_id'] = org_id
+        data['doctor_id'] = current_user_id
+        
         record = medical_record_service.create(data)
+        
+        # If this medical record is linked to a lab test, update the lab test status
+        if data.get('lab_test_id'):
+            try:
+                lab_test = lab_test_service.get_by_id(data['lab_test_id'])
+                if lab_test and lab_test.organization_id == org_id:
+                    lab_test.status = 'completed'
+                    lab_test_service.update(lab_test)
+            except Exception as e:
+                print(f"Warning: Could not update lab test status: {e}")
         
         return jsonify({
             'message': 'Medical record created successfully',
             'medical_record': {
                 'id': record.id,
-                'visit_date': record.visit_date.isoformat()
+                'visit_date': record.visit_date.isoformat(),
+                'diagnosis': record.diagnosis,
+                'treatment_plan': record.treatment_plan
             }
         }), 201
     except Exception as e:

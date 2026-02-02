@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Patient, LabTest, LabTestRequest } from '@/types';
+import { Patient, LabTest, LabTestRequest, MedicalRecord } from '@/types';
 import api from '@/services/api';
 import LabTestForm from '@/components/LabTestForm';
+import DiagnosisForm, { DiagnosisFormData } from '@/components/DiagnosisForm';
 
 type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'lab-tests';
 
@@ -89,6 +90,8 @@ export default function DoctorDashboard() {
   const [labTests, setLabTests] = useState<LabTest[]>([]);
   const [showLabTestForm, setShowLabTestForm] = useState(false);
   const [selectedPatientForTest, setSelectedPatientForTest] = useState<number | null>(null);
+  const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
+  const [selectedLabTestForDiagnosis, setSelectedLabTestForDiagnosis] = useState<LabTest | null>(null);
 
   useEffect(() => {
     loadQueueStatus();
@@ -184,6 +187,28 @@ export default function DoctorDashboard() {
   const orderLabTestForPatient = (patientId: number) => {
     setSelectedPatientForTest(patientId);
     setShowLabTestForm(true);
+  };
+
+  const handleDiagnosisSubmit = async (diagnosisData: DiagnosisFormData) => {
+    setLoading(true);
+    try {
+      await api.post('/healthcare/medical-records', diagnosisData);
+      showMessage('success', 'Diagnosis and medical record created successfully');
+      setShowDiagnosisForm(false);
+      setSelectedLabTestForDiagnosis(null);
+      if (currentView === 'lab-tests') {
+        loadLabTests();
+      }
+    } catch (error: any) {
+      showMessage('error', error.response?.data?.error || 'Failed to create diagnosis');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createDiagnosisForLabTest = (labTest: LabTest) => {
+    setSelectedLabTestForDiagnosis(labTest);
+    setShowDiagnosisForm(true);
   };
 
   const getTreatmentPriorityColor = (level: string) => {
@@ -634,6 +659,9 @@ export default function DoctorDashboard() {
                       <p><strong>Diagnosis:</strong> {record.diagnosis}</p>
                       <p><strong>Treatment Plan:</strong> {record.treatment_plan}</p>
                       {record.medications_prescribed && <p><strong>Medications:</strong> {record.medications_prescribed}</p>}
+                      {record.lab_tests_ordered && (
+                        <p><strong>Lab Tests:</strong> {record.lab_tests_ordered}</p>
+                      )}
                     </div>
                     <div>
                       {record.blood_pressure && <p><strong>Blood Pressure:</strong> {record.blood_pressure}</p>}
@@ -641,6 +669,9 @@ export default function DoctorDashboard() {
                       {record.temperature && <p><strong>Temperature:</strong> {record.temperature}°C</p>}
                       {record.weight && <p><strong>Weight:</strong> {record.weight} kg</p>}
                       {record.height && <p><strong>Height:</strong> {record.height} cm</p>}
+                      {record.follow_up_instructions && (
+                        <p><strong>Follow-up:</strong> {record.follow_up_instructions}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -778,6 +809,21 @@ export default function DoctorDashboard() {
                         </div>
                       )}
                     </div>
+                    
+                    {/* Action Buttons for Lab Tests */}
+                    <div className="flex flex-col space-y-2 ml-4">
+                      {test.status === 'completed' && test.result_value && (
+                        <button
+                          onClick={() => createDiagnosisForLabTest(test)}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>Create Diagnosis</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -812,6 +858,23 @@ export default function DoctorDashboard() {
                 onCancel={() => {
                   setShowLabTestForm(false);
                   setSelectedPatientForTest(null);
+                }}
+                loading={loading}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Diagnosis Form Modal */}
+        {showDiagnosisForm && selectedLabTestForDiagnosis && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+              <DiagnosisForm
+                labTest={selectedLabTestForDiagnosis}
+                onSubmit={handleDiagnosisSubmit}
+                onCancel={() => {
+                  setShowDiagnosisForm(false);
+                  setSelectedLabTestForDiagnosis(null);
                 }}
                 loading={loading}
               />

@@ -155,6 +155,28 @@ export interface LabTestRequest {
   lab_location?: string;
 }
 
+export interface MedicalRecord {
+  id?: number;
+  patient_id: number;
+  doctor_id: number;
+  appointment_id?: number;
+  visit_date: string;
+  chief_complaint?: string;
+  diagnosis?: string;
+  treatment_plan?: string;
+  medications_prescribed?: string;
+  lab_tests_ordered?: string;
+  follow_up_instructions?: string;
+  blood_pressure?: string;
+  heart_rate?: number;
+  temperature?: number;
+  weight?: number;
+  height?: number;
+  doctor_name?: string;
+  patient_name?: string;
+  lab_test_id?: number;
+}
+
 export interface ApiError {
   error: string;
 }
