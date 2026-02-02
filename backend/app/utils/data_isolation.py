@@ -222,8 +222,22 @@ class DepartmentService(BaseOrganizationService):
         from app.models import Department
         super().__init__(Department)
 
+class LabTestService(BaseOrganizationService):
+    def __init__(self):
+        from app.models import LabTest
+        super().__init__(LabTest)
+    
+    def get_by_patient(self, patient_id):
+        """Get all lab tests for a specific patient"""
+        return self.get_query().filter(self.model_class.patient_id == patient_id).all()
+    
+    def get_by_status(self, status):
+        """Get lab tests by status"""
+        return self.get_query().filter(self.model_class.status == status).all()
+
 # Create service instances
 patient_service = PatientService()
 appointment_service = AppointmentService()
 medical_record_service = MedicalRecordService()
 department_service = DepartmentService()
+lab_test_service = LabTestService()

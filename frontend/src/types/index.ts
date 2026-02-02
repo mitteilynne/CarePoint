@@ -118,6 +118,43 @@ export interface QueueStatus {
   }>;
 }
 
+export interface LabTest {
+  id?: number;
+  patient_id: number;
+  doctor_id: number;
+  test_type: 'blood_chemistry' | 'hematology' | 'urinalysis' | 'microbiology' | 'immunology' | 'toxicology' | 'pathology' | 'radiology' | 'other';
+  test_name: string;
+  test_code?: string;
+  clinical_notes?: string;
+  urgency: 'routine' | 'urgent' | 'stat';
+  sample_type?: string;
+  status: 'ordered' | 'sample_collected' | 'in_progress' | 'completed' | 'cancelled' | 'rejected';
+  ordered_at: string;
+  scheduled_for?: string;
+  sample_collected_at?: string;
+  completed_at?: string;
+  result_value?: string;
+  reference_range?: string;
+  units?: string;
+  abnormal_flag?: 'normal' | 'high' | 'low' | 'critical';
+  result_notes?: string;
+  lab_location?: string;
+  patient_name?: string;
+  doctor_name?: string;
+}
+
+export interface LabTestRequest {
+  patient_id: number;
+  test_type: LabTest['test_type'];
+  test_name: string;
+  test_code?: string;
+  clinical_notes?: string;
+  urgency?: LabTest['urgency'];
+  sample_type?: string;
+  scheduled_for?: string;
+  lab_location?: string;
+}
+
 export interface ApiError {
   error: string;
 }

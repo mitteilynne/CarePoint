@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Patient } from '@/types';
+import { Patient, LabTest, LabTestRequest } from '@/types';
 import api from '@/services/api';
+import LabTestForm from '@/components/LabTestForm';
 
-type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records';
+type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'lab-tests';
 
 interface QueuePatient {
   id: number;
@@ -85,6 +86,9 @@ export default function DoctorDashboard() {
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [labTests, setLabTests] = useState<LabTest[]>([]);
+  const [showLabTestForm, setShowLabTestForm] = useState(false);
+  const [selectedPatientForTest, setSelectedPatientForTest] = useState<number | null>(null);
 
   useEffect(() => {
     loadQueueStatus();
@@ -149,6 +153,39 @@ export default function DoctorDashboard() {
     }
   };
 
+  const loadLabTests = async (patientId?: number) => {
+    try {
+      const url = patientId ? `/healthcare/patients/${patientId}/lab-tests` : '/healthcare/lab-tests';
+      const response = await api.get(url);
+      setLabTests(response.data.lab_tests || []);
+    } catch (error) {
+      console.error('Failed to load lab tests:', error);
+      showMessage('error', 'Failed to load lab tests');
+    }
+  };
+
+  const handleLabTestSubmit = async (labTestData: LabTestRequest) => {
+    setLoading(true);
+    try {
+      await api.post('/healthcare/lab-tests', labTestData);
+      showMessage('success', 'Lab test ordered successfully');
+      setShowLabTestForm(false);
+      setSelectedPatientForTest(null);
+      if (currentView === 'lab-tests') {
+        loadLabTests();
+      }
+    } catch (error: any) {
+      showMessage('error', error.response?.data?.error || 'Failed to order lab test');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const orderLabTestForPatient = (patientId: number) => {
+    setSelectedPatientForTest(patientId);
+    setShowLabTestForm(true);
+  };
+
   const getTreatmentPriorityColor = (level: string) => {
     switch (level) {
       case 'emergency': return 'bg-red-100 text-red-800 border-red-200';
@@ -196,7 +233,7 @@ export default function DoctorDashboard() {
         )}
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <button
             onClick={() => setCurrentView('queue')}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2 transition-colors"
@@ -215,6 +252,19 @@ export default function DoctorDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span>View Triage Reports</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              setCurrentView('lab-tests');
+              loadLabTests();
+            }}
+            className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center space-x-2 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+            </svg>
+            <span>Lab Tests</span>
           </button>
           
           <button
@@ -330,6 +380,12 @@ export default function DoctorDashboard() {
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
                       Start Consultation
+                    </button>
+                    <button
+                      onClick={() => orderLabTestForPatient(parseInt(patient.patient_id))}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      Order Lab Test
                     </button>
                     <button
                       onClick={() => {
@@ -538,9 +594,15 @@ export default function DoctorDashboard() {
                         loadPatientRecords(patient.id);
                         setSearchQuery(`${patient.first_name} ${patient.last_name}`);
                       }}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors mr-2"
                     >
                       View Records
+                    </button>
+                    <button
+                      onClick={() => orderLabTestForPatient(patient.id)}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      Order Lab Test
                     </button>
                   </div>
                 ))}
@@ -590,6 +652,142 @@ export default function DoctorDashboard() {
     </div>
   );
 
+  const renderLabTests = () => {
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'ordered': return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'sample_collected': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        case 'in_progress': return 'bg-orange-100 text-orange-800 border-orange-200';
+        case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+        case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+        case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
+        default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      }
+    };
+
+    const getUrgencyColor = (urgency: string) => {
+      switch (urgency) {
+        case 'stat': return 'bg-red-100 text-red-800';
+        case 'urgent': return 'bg-orange-100 text-orange-800';
+        case 'routine': return 'bg-blue-100 text-blue-800';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Message Display */}
+        {message.text && (
+          <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {message.text}
+            <button onClick={() => setMessage({ type: '', text: '' })} className="float-right text-lg">&times;</button>
+          </div>
+        )}
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Lab Tests</h2>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowLabTestForm(true)}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                + Order New Test
+              </button>
+              <button
+                onClick={() => loadLabTests()}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                🔄 Refresh
+              </button>
+              <button
+                onClick={() => setCurrentView('dashboard')}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+
+          {labTests.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+              <p>No lab tests found</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {labTests.map((test) => (
+                <div key={test.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        <h3 className="text-lg font-semibold mr-3">{test.test_name}</h3>
+                        <span className={`px-2 py-1 text-sm rounded-full font-medium ${getStatusColor(test.status)}`}>
+                          {test.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                        <span className={`ml-2 px-2 py-1 text-xs rounded-full ${getUrgencyColor(test.urgency)}`}>
+                          {test.urgency.toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 mb-2">
+                        <strong>Patient:</strong> {test.patient_name}
+                        {test.test_code && <span className="ml-4"><strong>Code:</strong> {test.test_code}</span>}
+                      </p>
+                      <p className="text-gray-700 mb-2">
+                        <strong>Type:</strong> {test.test_type.replace('_', ' ')}
+                        {test.sample_type && <span className="ml-4"><strong>Sample:</strong> {test.sample_type}</span>}
+                      </p>
+                      
+                      <div className="text-sm text-gray-600 mb-2">
+                        <span><strong>Ordered:</strong> {new Date(test.ordered_at).toLocaleString()}</span>
+                        {test.scheduled_for && (
+                          <span className="ml-4"><strong>Scheduled:</strong> {new Date(test.scheduled_for).toLocaleString()}</span>
+                        )}
+                        {test.lab_location && <span className="ml-4"><strong>Lab:</strong> {test.lab_location}</span>}
+                      </div>
+
+                      {test.clinical_notes && (
+                        <div className="text-sm text-gray-700 mb-2">
+                          <strong>Clinical Notes:</strong> {test.clinical_notes}
+                        </div>
+                      )}
+
+                      {test.result_value && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                          <h4 className="font-semibold text-blue-900 mb-1">Results</h4>
+                          <p className="text-blue-800">
+                            <strong>Value:</strong> {test.result_value}
+                            {test.units && <span> {test.units}</span>}
+                            {test.reference_range && <span className="ml-2">(Normal: {test.reference_range})</span>}
+                          </p>
+                          {test.abnormal_flag && test.abnormal_flag !== 'normal' && (
+                            <p className={`text-sm font-medium ${
+                              test.abnormal_flag === 'critical' ? 'text-red-700' : 
+                              test.abnormal_flag === 'high' || test.abnormal_flag === 'low' ? 'text-orange-700' : 'text-blue-700'
+                            }`}>
+                              {test.abnormal_flag.toUpperCase()}
+                            </p>
+                          )}
+                          {test.result_notes && (
+                            <p className="text-blue-700 text-sm mt-1">
+                              <strong>Notes:</strong> {test.result_notes}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -602,6 +800,24 @@ export default function DoctorDashboard() {
         {currentView === 'queue' && renderQueue()}
         {currentView === 'triage' && renderTriage()}
         {currentView === 'records' && renderRecords()}
+        {currentView === 'lab-tests' && renderLabTests()}
+
+        {/* Lab Test Form Modal */}
+        {showLabTestForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <LabTestForm
+                selectedPatientId={selectedPatientForTest || undefined}
+                onSubmit={handleLabTestSubmit}
+                onCancel={() => {
+                  setShowLabTestForm(false);
+                  setSelectedPatientForTest(null);
+                }}
+                loading={loading}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

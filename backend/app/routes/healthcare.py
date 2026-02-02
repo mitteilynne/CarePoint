@@ -10,10 +10,11 @@ from app.utils.data_isolation import (
     appointment_service, 
     medical_record_service, 
     department_service,
+    lab_test_service,
     organization_required,
     organization_access_required
 )
-from app.models import Patient, Appointment, MedicalRecord, Department
+from app.models import Patient, Appointment, MedicalRecord, Department, LabTest
 from datetime import datetime, date
 import traceback
 
@@ -338,3 +339,170 @@ def test_data_isolation():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Lab Test routes
+@bp.route('/lab-tests', methods=['GET'])
+@jwt_required()
+@organization_required
+def get_lab_tests():
+    """Get all lab tests for the current organization"""
+    try:
+        patient_id = request.args.get('patient_id')
+        status = request.args.get('status')
+        
+        if patient_id:
+            lab_tests = lab_test_service.get_by_patient(int(patient_id))
+        elif status:
+            lab_tests = lab_test_service.get_by_status(status)
+        else:
+            lab_tests = lab_test_service.get_all()
+        
+        return jsonify({
+            'lab_tests': [{
+                'id': test.id,
+                'patient_id': test.patient_id,
+                'doctor_id': test.doctor_id,
+                'test_type': test.test_type,
+                'test_name': test.test_name,
+                'test_code': test.test_code,
+                'clinical_notes': test.clinical_notes,
+                'urgency': test.urgency,
+                'sample_type': test.sample_type,
+                'status': test.status,
+                'ordered_at': test.ordered_at.isoformat(),
+                'scheduled_for': test.scheduled_for.isoformat() if test.scheduled_for else None,
+                'sample_collected_at': test.sample_collected_at.isoformat() if test.sample_collected_at else None,
+                'completed_at': test.completed_at.isoformat() if test.completed_at else None,
+                'result_value': test.result_value,
+                'reference_range': test.reference_range,
+                'units': test.units,
+                'abnormal_flag': test.abnormal_flag,
+                'result_notes': test.result_notes,
+                'lab_location': test.lab_location
+            } for test in lab_tests],
+            'total': len(lab_tests)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/patients/<int:patient_id>/lab-tests', methods=['GET'])
+@jwt_required()
+@organization_access_required(Patient)
+def get_patient_lab_tests(patient_id):
+    """Get all lab tests for a specific patient (organization-scoped)"""
+    try:
+        lab_tests = lab_test_service.get_by_patient(patient_id)
+        
+        return jsonify({
+            'lab_tests': [{
+                'id': test.id,
+                'patient_id': test.patient_id,
+                'doctor_id': test.doctor_id,
+                'test_type': test.test_type,
+                'test_name': test.test_name,
+                'test_code': test.test_code,
+                'clinical_notes': test.clinical_notes,
+                'urgency': test.urgency,
+                'sample_type': test.sample_type,
+                'status': test.status,
+                'ordered_at': test.ordered_at.isoformat(),
+                'scheduled_for': test.scheduled_for.isoformat() if test.scheduled_for else None,
+                'sample_collected_at': test.sample_collected_at.isoformat() if test.sample_collected_at else None,
+                'completed_at': test.completed_at.isoformat() if test.completed_at else None,
+                'result_value': test.result_value,
+                'reference_range': test.reference_range,
+                'units': test.units,
+                'abnormal_flag': test.abnormal_flag,
+                'result_notes': test.result_notes,
+                'lab_location': test.lab_location,
+                'patient_name': f"{test.patient.first_name} {test.patient.last_name}" if test.patient else None,
+                'doctor_name': f"Dr. {test.doctor.first_name} {test.doctor.last_name}" if test.doctor else None
+            } for test in lab_tests]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/lab-tests', methods=['POST'])
+@jwt_required()
+@organization_required
+def create_lab_test():
+    """Create a new lab test request (automatically scoped to current organization)"""
+    try:
+        data = request.get_json()
+        claims = get_jwt()
+        current_user_id = claims.get('user_id')
+        org_id = claims.get('organization_id')
+        
+        # Convert scheduled_for string to datetime object if provided
+        scheduled_for = None
+        if data.get('scheduled_for'):
+            scheduled_for = datetime.fromisoformat(data['scheduled_for'].replace('Z', '+00:00'))
+        
+        lab_test = lab_test_service.create({
+            'organization_id': org_id,
+            'patient_id': data['patient_id'],
+            'doctor_id': current_user_id,
+            'test_type': data['test_type'],
+            'test_name': data['test_name'],
+            'test_code': data.get('test_code'),
+            'clinical_notes': data.get('clinical_notes'),
+            'urgency': data.get('urgency', 'routine'),
+            'sample_type': data.get('sample_type'),
+            'scheduled_for': scheduled_for,
+            'lab_location': data.get('lab_location')
+        })
+        
+        return jsonify({
+            'message': 'Lab test ordered successfully',
+            'lab_test': {
+                'id': lab_test.id,
+                'test_name': lab_test.test_name,
+                'test_type': lab_test.test_type,
+                'status': lab_test.status,
+                'urgency': lab_test.urgency,
+                'ordered_at': lab_test.ordered_at.isoformat()
+            }
+        }), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/lab-tests/<int:test_id>', methods=['PUT'])
+@jwt_required()
+@organization_access_required(LabTest)
+def update_lab_test(test_id):
+    """Update a lab test (organization-scoped)"""
+    try:
+        lab_test = lab_test_service.get_by_id(test_id)
+        if not lab_test:
+            return jsonify({'error': 'Lab test not found'}), 404
+        
+        data = request.get_json()
+        
+        # Update allowed fields
+        updatable_fields = [
+            'status', 'sample_collected_at', 'completed_at', 'result_value', 
+            'reference_range', 'units', 'abnormal_flag', 'result_notes', 
+            'lab_technician_id', 'scheduled_for'
+        ]
+        
+        for field in updatable_fields:
+            if field in data:
+                if field in ['sample_collected_at', 'completed_at', 'scheduled_for'] and data[field]:
+                    # Convert datetime strings to datetime objects
+                    setattr(lab_test, field, datetime.fromisoformat(data[field].replace('Z', '+00:00')))
+                else:
+                    setattr(lab_test, field, data[field])
+        
+        lab_test_service.update(lab_test)
+        
+        return jsonify({
+            'message': 'Lab test updated successfully',
+            'lab_test': {
+                'id': lab_test.id,
+                'status': lab_test.status,
+                'result_value': lab_test.result_value,
+                'abnormal_flag': lab_test.abnormal_flag
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400

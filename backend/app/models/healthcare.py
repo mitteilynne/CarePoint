@@ -262,6 +262,68 @@ class Triage(db.Model):
         self.priority_score = score
         return score
 
+class LabTest(db.Model):
+    """Lab test requests and results with organization isolation"""
+    __tablename__ = 'lab_tests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    
+    # Test details
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    test_type = db.Column(db.Enum(
+        'blood_chemistry', 'hematology', 'urinalysis', 'microbiology', 
+        'immunology', 'toxicology', 'pathology', 'radiology', 'other',
+        name='lab_test_types'
+    ), nullable=False)
+    test_name = db.Column(db.String(200), nullable=False)
+    test_code = db.Column(db.String(50))  # Internal lab code
+    
+    # Request details
+    clinical_notes = db.Column(db.Text)  # Doctor's notes/reason for test
+    urgency = db.Column(db.Enum('routine', 'urgent', 'stat', name='test_urgency'), nullable=False, default='routine')
+    sample_type = db.Column(db.String(100))  # blood, urine, stool, etc.
+    
+    # Status and scheduling
+    status = db.Column(db.Enum(
+        'ordered', 'sample_collected', 'in_progress', 'completed', 'cancelled', 'rejected',
+        name='lab_test_status'
+    ), nullable=False, default='ordered')
+    
+    # Timestamps
+    ordered_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    scheduled_for = db.Column(db.DateTime)  # When to perform the test
+    sample_collected_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    
+    # Results
+    result_value = db.Column(db.Text)  # Numeric or text result
+    reference_range = db.Column(db.String(100))  # Normal range
+    units = db.Column(db.String(50))  # mg/dL, mmol/L, etc.
+    abnormal_flag = db.Column(db.Enum('normal', 'high', 'low', 'critical', name='abnormal_flags'))
+    result_notes = db.Column(db.Text)  # Lab technician notes
+    
+    # Lab information
+    lab_technician_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    lab_location = db.Column(db.String(100))
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    organization = db.relationship('Organization', backref=db.backref('lab_tests', lazy='dynamic'))
+    patient = db.relationship('Patient', backref='lab_tests')
+    doctor = db.relationship('User', foreign_keys=[doctor_id], backref='ordered_lab_tests')
+    lab_technician = db.relationship('User', foreign_keys=[lab_technician_id], backref='processed_lab_tests')
+    
+    # Indexes for efficient querying
+    __table_args__ = (
+        db.Index('idx_lab_test_org_patient', 'organization_id', 'patient_id'),
+        db.Index('idx_lab_test_org_status', 'organization_id', 'status'),
+        db.Index('idx_lab_test_org_date', 'organization_id', 'ordered_at'),
+    )
+
 class QueueManagement(db.Model):
     """Daily queue management for organizations"""
     __tablename__ = 'queue_management'
@@ -322,6 +384,7 @@ class QueueManagement(db.Model):
 @event.listens_for(Appointment, 'before_insert')
 @event.listens_for(MedicalRecord, 'before_insert')
 @event.listens_for(Triage, 'before_insert')
+@event.listens_for(LabTest, 'before_insert')
 @event.listens_for(QueueManagement, 'before_insert')
 def validate_organization_before_insert(mapper, connection, target):
     """Ensure organization_id is always set before inserting records"""
