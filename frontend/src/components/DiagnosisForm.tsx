@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { LabTest, Patient } from '@/types';
+import { LabTest } from '@/types';
 
 interface DiagnosisFormProps {
   labTest: LabTest;
-  patient?: Patient;
   onSubmit: (diagnosisData: DiagnosisFormData) => void;
   onCancel: () => void;
   loading?: boolean;
@@ -27,7 +26,6 @@ export interface DiagnosisFormData {
 
 export default function DiagnosisForm({ 
   labTest, 
-  patient, 
   onSubmit, 
   onCancel, 
   loading = false 
