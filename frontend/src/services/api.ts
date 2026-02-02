@@ -84,4 +84,32 @@ export const labTechnicianAPI = {
   },
 };
 
+// Notifications API
+export const notificationsAPI = {
+  getNotifications: async (filters?: { is_read?: boolean; type?: string; limit?: number }) => {
+    const response = await api.get('/notifications', { params: filters });
+    return response.data;
+  },
+
+  markAsRead: async (notificationId: number) => {
+    const response = await api.put(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+
+  markAllAsRead: async () => {
+    const response = await api.put('/notifications/mark-all-read');
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/unread-count');
+    return response.data;
+  },
+
+  getLabResults: async () => {
+    const response = await api.get('/notifications/lab-results');
+    return response.data;
+  },
+};
+
 export default api;

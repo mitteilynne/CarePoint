@@ -205,3 +205,37 @@ export interface Referral {
 export interface ApiError {
   error: string;
 }
+
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  notification_type: 'lab_result' | 'appointment' | 'referral' | 'system' | 'urgent';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  is_read: boolean;
+  lab_test_id?: number;
+  patient_id?: number;
+  created_at: string;
+  read_at?: string;
+  sender?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    role: string;
+  };
+  lab_test?: {
+    id: number;
+    test_name: string;
+    test_type: string;
+    result_value: string;
+    result_notes: string;
+    abnormal_flag: 'normal' | 'high' | 'low' | 'critical';
+    completed_at: string;
+    patient: {
+      id: number;
+      first_name: string;
+      last_name: string;
+      patient_id: string;
+    };
+  };
+}

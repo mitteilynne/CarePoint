@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..models.healthcare import LabTest, Patient, MedicalRecord
+from ..models.healthcare import LabTest, Patient, MedicalRecord, Notification
 from ..models.user import User
 from .. import db
 from ..utils.data_isolation import OrganizationScopedQuery
@@ -183,6 +183,29 @@ def submit_test_results():
         lab_test.completed_at = datetime.utcnow()
         
         db.session.commit()
+        
+        # Create notification for the ordering doctor
+        patient = lab_test.patient
+        doctor = lab_test.doctor
+        
+        if doctor:
+            # Determine priority based on abnormal flag
+            priority = 'critical' if results_data.get('abnormal_flag') == 'critical' else \
+                      'high' if results_data.get('abnormal_flag') in ['high', 'low'] else 'medium'
+            
+            notification = Notification(
+                organization_id=user_org_id,
+                recipient_id=doctor.id,
+                sender_id=current_user_id,
+                title=f"Lab Results Ready: {lab_test.test_name}",
+                message=f"Lab results are now available for {patient.first_name} {patient.last_name} (ID: {patient.patient_id}). Test: {lab_test.test_name}. Result: {results_data.get('abnormal_flag', 'normal').upper()}",
+                notification_type='lab_result',
+                priority=priority,
+                lab_test_id=lab_test.id,
+                patient_id=patient.id
+            )
+            db.session.add(notification)
+            db.session.commit()
         
         return jsonify({
             'message': 'Test results submitted successfully',

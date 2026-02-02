@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Patient, LabTest, LabTestRequest, MedicalRecord } from '@/types';
-import api from '@/services/api';
+import { Patient, LabTest, LabTestRequest, MedicalRecord, Notification } from '@/types';
+import api, { notificationsAPI } from '@/services/api';
 import LabTestForm from '@/components/LabTestForm';
 import DiagnosisForm, { DiagnosisFormData } from '@/components/DiagnosisForm';
 
-type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'lab-tests' | 'referrals';
+type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'lab-tests' | 'referrals' | 'notifications';
 
 interface QueuePatient {
   id: number;
@@ -93,11 +93,18 @@ export default function DoctorDashboard() {
   const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
   const [selectedLabTestForDiagnosis, setSelectedLabTestForDiagnosis] = useState<LabTest | null>(null);
   const [referrals, setReferrals] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     loadQueueStatus();
+    loadNotifications();
+    loadUnreadCount();
     // Auto-refresh every 30 seconds
-    const interval = setInterval(loadQueueStatus, 30000);
+    const interval = setInterval(() => {
+      loadQueueStatus();
+      loadUnreadCount();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -114,6 +121,36 @@ export default function DoctorDashboard() {
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+  };
+
+  const loadNotifications = async () => {
+    try {
+      const response = await notificationsAPI.getLabResults();
+      setNotifications(response.notifications);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  };
+
+  const loadUnreadCount = async () => {
+    try {
+      const response = await notificationsAPI.getUnreadCount();
+      setUnreadCount(response.unread_count);
+    } catch (error) {
+      console.error('Failed to load unread count:', error);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: number) => {
+    try {
+      await notificationsAPI.markAsRead(notificationId);
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+      );
+      await loadUnreadCount();
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
   };
 
   const handlePatientAction = async (triageId: number, action: string) => {
@@ -279,7 +316,7 @@ export default function DoctorDashboard() {
         )}
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <button
             onClick={() => setCurrentView('queue')}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2 transition-colors"
@@ -311,6 +348,24 @@ export default function DoctorDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
             </svg>
             <span>Lab Tests</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              setCurrentView('notifications');
+              loadNotifications();
+            }}
+            className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 flex items-center justify-center space-x-2 transition-colors relative"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span>Lab Results</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-yellow-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
           </button>
           
           <button
@@ -983,6 +1038,169 @@ export default function DoctorDashboard() {
     );
   };
 
+  const renderNotifications = () => {
+    const getPriorityColor = (priority: string) => {
+      switch (priority) {
+        case 'high': return 'bg-red-100 text-red-800 border-red-200';
+        case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        case 'low': return 'bg-green-100 text-green-800 border-green-200';
+        default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      }
+    };
+
+    const formatDateTime = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Message Display */}
+        {message.text && (
+          <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {message.text}
+            <button onClick={() => setMessage({ type: '', text: '' })} className="float-right text-lg">&times;</button>
+          </div>
+        )}
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center space-x-2">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <span>Lab Result Notifications</span>
+              {unreadCount > 0 && (
+                <span className="bg-red-600 text-white text-sm rounded-full px-2 py-1">{unreadCount} unread</span>
+              )}
+            </h2>
+            <div className="flex space-x-3">
+              <button
+                onClick={loadNotifications}
+                disabled={loading}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? '🔄 Loading...' : '🔄 Refresh'}
+              </button>
+              <button
+                onClick={() => setCurrentView('dashboard')}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+
+          {notifications.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <p>No lab result notifications</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {notifications.map((notification) => (
+                <div 
+                  key={notification.id} 
+                  className={`border rounded-lg p-4 hover:bg-gray-50 transition-colors ${
+                    !notification.is_read ? 'border-red-200 bg-red-50' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        <h3 className="text-lg font-semibold mr-3">{notification.title}</h3>
+                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${getPriorityColor(notification.priority)}`}>
+                          {notification.priority.toUpperCase()}
+                        </span>
+                        {!notification.is_read && (
+                          <span className="ml-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full">NEW</span>
+                        )}
+                      </div>
+                      
+                      <p className="text-gray-700 mb-3">{notification.message}</p>
+                      
+                      {/* Lab Test Details */}
+                      {notification.lab_test && (
+                        <div className="bg-gray-100 p-3 rounded-lg mb-3">
+                          <h4 className="font-semibold text-sm mb-2">Lab Test Details:</h4>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p><strong>Patient:</strong> {notification.lab_test.patient_name}</p>
+                              <p><strong>Test Type:</strong> {notification.lab_test.test_type}</p>
+                              <p><strong>Status:</strong> 
+                                <span className={`ml-1 px-2 py-1 rounded-full text-xs ${
+                                  notification.lab_test.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                                  notification.lab_test.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 
+                                  'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {notification.lab_test.status.replace('_', ' ').toUpperCase()}
+                                </span>
+                              </p>
+                            </div>
+                            <div>
+                              {notification.lab_test.result_value && (
+                                <>
+                                  <p><strong>Result:</strong> {notification.lab_test.result_value} {notification.lab_test.unit}</p>
+                                  <p><strong>Reference Range:</strong> {notification.lab_test.reference_range}</p>
+                                  {notification.lab_test.is_abnormal && (
+                                    <p className="text-red-600 font-semibold">⚠️ Abnormal Result</p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          {notification.lab_test.notes && (
+                            <div className="mt-2">
+                              <p><strong>Notes:</strong> {notification.lab_test.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center text-sm text-gray-500 space-x-4">
+                        <span>📅 {formatDateTime(notification.created_at)}</span>
+                        <span>👨‍⚕️ From: Lab Technician</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-2 ml-4">
+                      {!notification.is_read && (
+                        <button
+                          onClick={() => markNotificationAsRead(notification.id)}
+                          disabled={loading}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>Mark Read</span>
+                        </button>
+                      )}
+                      
+                      {notification.lab_test && notification.lab_test.status === 'completed' && (
+                        <button
+                          onClick={() => createDiagnosisForLabTest(notification.lab_test)}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>Create Diagnosis</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -996,6 +1214,7 @@ export default function DoctorDashboard() {
         {currentView === 'triage' && renderTriage()}
         {currentView === 'records' && renderRecords()}
         {currentView === 'lab-tests' && renderLabTests()}
+        {currentView === 'notifications' && renderNotifications()}
         {currentView === 'referrals' && renderReferrals()}
 
         {/* Lab Test Form Modal */}

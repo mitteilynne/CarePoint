@@ -427,6 +427,80 @@ class QueueManagement(db.Model):
         self.total_patients_today += 1
         return self.current_queue_number
 
+class Notification(db.Model):
+    """Notifications for healthcare workers"""
+    __tablename__ = 'notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    
+    # Notification details
+    recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Who receives the notification
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Who sent it (optional)
+    
+    # Notification content
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    notification_type = db.Column(db.Enum(
+        'lab_result', 'appointment', 'referral', 'system', 'urgent',
+        name='notification_types'
+    ), nullable=False)
+    
+    # Status and metadata
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    priority = db.Column(db.Enum('low', 'medium', 'high', 'critical', name='notification_priority'), 
+                         nullable=False, default='medium')
+    
+    # Related entities (optional)
+    lab_test_id = db.Column(db.Integer, db.ForeignKey('lab_tests.id'))
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'))
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    read_at = db.Column(db.DateTime)
+    
+    # Relationships
+    organization = db.relationship('Organization', backref=db.backref('notifications', lazy='dynamic'))
+    recipient = db.relationship('User', foreign_keys=[recipient_id], backref='notifications_received')
+    sender = db.relationship('User', foreign_keys=[sender_id], backref='notifications_sent')
+    lab_test = db.relationship('LabTest', backref='notifications')
+    patient = db.relationship('Patient', backref='notifications')
+    
+    # Indexes
+    __table_args__ = (
+        db.Index('idx_notification_recipient', 'organization_id', 'recipient_id', 'is_read'),
+        db.Index('idx_notification_created', 'created_at'),
+    )
+    
+    def mark_as_read(self):
+        """Mark notification as read"""
+        self.is_read = True
+        self.read_at = datetime.utcnow()
+    
+    def to_dict(self):
+        """Convert notification to dictionary"""
+        return {
+            'id': self.id,
+            'title': self.title,
+            'message': self.message,
+            'notification_type': self.notification_type,
+            'priority': self.priority,
+            'is_read': self.is_read,
+            'lab_test_id': self.lab_test_id,
+            'patient_id': self.patient_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'read_at': self.read_at.isoformat() if self.read_at else None,
+            'sender': {
+                'id': self.sender.id,
+                'first_name': self.sender.first_name,
+                'last_name': self.sender.last_name,
+                'role': self.sender.role
+            } if self.sender else None
+        }
+    
+    def __repr__(self):
+        return f'<Notification {self.id}: {self.notification_type} for User {self.recipient_id}>'
+
 # Data isolation enforcement through SQLAlchemy events
 @event.listens_for(Patient, 'before_insert')
 @event.listens_for(Department, 'before_insert')
@@ -436,6 +510,7 @@ class QueueManagement(db.Model):
 @event.listens_for(LabTest, 'before_insert')
 @event.listens_for(Referral, 'before_insert')
 @event.listens_for(QueueManagement, 'before_insert')
+@event.listens_for(Notification, 'before_insert')
 def validate_organization_before_insert(mapper, connection, target):
     """Ensure organization_id is always set before inserting records"""
     if not hasattr(target, 'organization_id') or target.organization_id is None:
