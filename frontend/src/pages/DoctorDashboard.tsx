@@ -4,7 +4,7 @@ import api from '@/services/api';
 import LabTestForm from '@/components/LabTestForm';
 import DiagnosisForm, { DiagnosisFormData } from '@/components/DiagnosisForm';
 
-type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'lab-tests';
+type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'lab-tests' | 'referrals';
 
 interface QueuePatient {
   id: number;
@@ -92,6 +92,7 @@ export default function DoctorDashboard() {
   const [selectedPatientForTest, setSelectedPatientForTest] = useState<number | null>(null);
   const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
   const [selectedLabTestForDiagnosis, setSelectedLabTestForDiagnosis] = useState<LabTest | null>(null);
+  const [referrals, setReferrals] = useState<any[]>([]);
 
   useEffect(() => {
     loadQueueStatus();
@@ -192,8 +193,18 @@ export default function DoctorDashboard() {
   const handleDiagnosisSubmit = async (diagnosisData: DiagnosisFormData) => {
     setLoading(true);
     try {
-      await api.post('/healthcare/medical-records', diagnosisData);
-      showMessage('success', 'Diagnosis and medical record created successfully');
+      const response = await api.post('/healthcare/medical-records', diagnosisData);
+      let message = 'Diagnosis and medical record created successfully';
+      
+      if (response.data.referral_created) {
+        if (diagnosisData.referral_type === 'internal') {
+          message += ' and internal referral created';
+        } else if (diagnosisData.referral_type === 'external') {
+          message += ' and external referral created';
+        }
+      }
+      
+      showMessage('success', message);
       setShowDiagnosisForm(false);
       setSelectedLabTestForDiagnosis(null);
       if (currentView === 'lab-tests') {
@@ -209,6 +220,16 @@ export default function DoctorDashboard() {
   const createDiagnosisForLabTest = (labTest: LabTest) => {
     setSelectedLabTestForDiagnosis(labTest);
     setShowDiagnosisForm(true);
+  };
+
+  const loadReferrals = async () => {
+    try {
+      const response = await api.get('/healthcare/referrals');
+      setReferrals(response.data.referrals || []);
+    } catch (error) {
+      console.error('Failed to load referrals:', error);
+      showMessage('error', 'Failed to load referrals');
+    }
   };
 
   const getTreatmentPriorityColor = (level: string) => {
@@ -258,7 +279,7 @@ export default function DoctorDashboard() {
         )}
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <button
             onClick={() => setCurrentView('queue')}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2 transition-colors"
@@ -266,7 +287,7 @@ export default function DoctorDashboard() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <span>View Queue</span>
+            <span>Queue</span>
           </button>
           
           <button
@@ -276,7 +297,7 @@ export default function DoctorDashboard() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <span>View Triage Reports</span>
+            <span>Triage</span>
           </button>
           
           <button
@@ -293,13 +314,26 @@ export default function DoctorDashboard() {
           </button>
           
           <button
+            onClick={() => {
+              setCurrentView('referrals');
+              loadReferrals();
+            }}
+            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 flex items-center justify-center space-x-2 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <span>Referrals</span>
+          </button>
+          
+          <button
             onClick={() => setCurrentView('records')}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center justify-center space-x-2 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
-            <span>Patient Records</span>
+            <span>Records</span>
           </button>
         </div>
       </div>
@@ -834,6 +868,121 @@ export default function DoctorDashboard() {
     );
   };
 
+  const renderReferrals = () => {
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        case 'accepted': return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+        case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+        default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      }
+    };
+
+    const getUrgencyColor = (urgency: string) => {
+      switch (urgency) {
+        case 'emergency': return 'bg-red-100 text-red-800';
+        case 'urgent': return 'bg-orange-100 text-orange-800';
+        case 'routine': return 'bg-blue-100 text-blue-800';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Message Display */}
+        {message.text && (
+          <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {message.text}
+            <button onClick={() => setMessage({ type: '', text: '' })} className="float-right text-lg">&times;</button>
+          </div>
+        )}
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Patient Referrals</h2>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => loadReferrals()}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                🔄 Refresh
+              </button>
+              <button
+                onClick={() => setCurrentView('dashboard')}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+
+          {referrals.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              <p>No referrals found</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {referrals.map((referral) => (
+                <div key={referral.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        <h3 className="text-lg font-semibold mr-3">{referral.patient_name}</h3>
+                        <span className={`px-2 py-1 text-sm rounded-full font-medium ${getStatusColor(referral.status)}`}>
+                          {referral.status.toUpperCase()}
+                        </span>
+                        <span className={`ml-2 px-2 py-1 text-xs rounded-full ${getUrgencyColor(referral.urgency)}`}>
+                          {referral.urgency.toUpperCase()}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-3">
+                        <div>
+                          <p><strong>Type:</strong> {referral.referral_type === 'internal' ? 'Internal' : 'External'}</p>
+                          {referral.referral_type === 'internal' ? (
+                            <>
+                              {referral.department_name && <p><strong>Department:</strong> {referral.department_name}</p>}
+                              {referral.referred_doctor_name && <p><strong>Referred to:</strong> {referral.referred_doctor_name}</p>}
+                            </>
+                          ) : (
+                            <>
+                              <p><strong>Facility:</strong> {referral.facility_name}</p>
+                              {referral.facility_type && <p><strong>Type:</strong> {referral.facility_type}</p>}
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <p><strong>Created:</strong> {new Date(referral.created_at).toLocaleDateString()}</p>
+                          {referral.scheduled_date && (
+                            <p><strong>Scheduled:</strong> {new Date(referral.scheduled_date).toLocaleDateString()}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-sm text-gray-700 mb-2">
+                        <strong>Reason:</strong> {referral.reason}
+                      </div>
+
+                      {referral.notes && (
+                        <div className="text-sm text-gray-600">
+                          <strong>Notes:</strong> {referral.notes}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -847,6 +996,7 @@ export default function DoctorDashboard() {
         {currentView === 'triage' && renderTriage()}
         {currentView === 'records' && renderRecords()}
         {currentView === 'lab-tests' && renderLabTests()}
+        {currentView === 'referrals' && renderReferrals()}
 
         {/* Lab Test Form Modal */}
         {showLabTestForm && (

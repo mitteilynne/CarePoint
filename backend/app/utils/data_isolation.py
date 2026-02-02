@@ -235,9 +235,27 @@ class LabTestService(BaseOrganizationService):
         """Get lab tests by status"""
         return self.get_query().filter(self.model_class.status == status).all()
 
+class ReferralService(BaseOrganizationService):
+    def __init__(self):
+        from app.models import Referral
+        super().__init__(Referral)
+    
+    def get_by_patient(self, patient_id):
+        """Get all referrals for a specific patient"""
+        return self.get_query().filter(self.model_class.patient_id == patient_id).all()
+    
+    def get_by_referring_doctor(self, doctor_id):
+        """Get referrals made by a specific doctor"""
+        return self.get_query().filter(self.model_class.referring_doctor_id == doctor_id).all()
+    
+    def get_by_referred_doctor(self, doctor_id):
+        """Get referrals received by a specific doctor"""
+        return self.get_query().filter(self.model_class.referred_doctor_id == doctor_id).all()
+
 # Create service instances
 patient_service = PatientService()
 appointment_service = AppointmentService()
 medical_record_service = MedicalRecordService()
 department_service = DepartmentService()
 lab_test_service = LabTestService()
+referral_service = ReferralService()

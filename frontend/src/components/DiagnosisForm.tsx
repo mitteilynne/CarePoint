@@ -22,6 +22,12 @@ export interface DiagnosisFormData {
   weight?: number;
   height?: number;
   lab_test_id?: number;
+  referral_type: 'none' | 'internal' | 'external';
+  referral_doctor_id?: number;
+  referral_department_id?: number;
+  referral_facility?: string;
+  referral_reason?: string;
+  referral_urgency?: 'routine' | 'urgent' | 'emergency';
 }
 
 export default function DiagnosisForm({ 
@@ -43,10 +49,16 @@ export default function DiagnosisForm({
     temperature: undefined,
     weight: undefined,
     height: undefined,
-    lab_test_id: labTest.id
+    lab_test_id: labTest.id,
+    referral_type: 'none',
+    referral_doctor_id: undefined,
+    referral_department_id: undefined,
+    referral_facility: '',
+    referral_reason: '',
+    referral_urgency: 'routine'
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -313,6 +325,169 @@ export default function DiagnosisForm({
               />
             </div>
           </div>
+        </div>
+
+        {/* Referral and Next Steps */}
+        <div>
+          <h4 className="font-medium text-gray-900 mb-3">Referral & Next Steps</h4>
+          
+          {/* Referral Type */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Patient Disposition
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="radio"
+                  name="referral_type"
+                  value="none"
+                  checked={formData.referral_type === 'none'}
+                  onChange={handleInputChange}
+                  className="mr-3"
+                />
+                <div>
+                  <div className="font-medium text-green-700">Prescription Only</div>
+                  <div className="text-sm text-gray-600">Provide medication and discharge</div>
+                </div>
+              </label>
+              
+              <label className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="radio"
+                  name="referral_type"
+                  value="internal"
+                  checked={formData.referral_type === 'internal'}
+                  onChange={handleInputChange}
+                  className="mr-3"
+                />
+                <div>
+                  <div className="font-medium text-blue-700">Internal Referral</div>
+                  <div className="text-sm text-gray-600">Refer to another doctor here</div>
+                </div>
+              </label>
+              
+              <label className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="radio"
+                  name="referral_type"
+                  value="external"
+                  checked={formData.referral_type === 'external'}
+                  onChange={handleInputChange}
+                  className="mr-3"
+                />
+                <div>
+                  <div className="font-medium text-orange-700">External Referral</div>
+                  <div className="text-sm text-gray-600">Refer to another facility</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Internal Referral Fields */}
+          {formData.referral_type === 'internal' && (
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+              <h5 className="font-medium text-blue-900 mb-3">Internal Referral Details</h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Department</label>
+                  <select
+                    name="referral_department_id"
+                    value={formData.referral_department_id || ''}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      referral_department_id: e.target.value ? parseInt(e.target.value) : undefined 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select department...</option>
+                    <option value="1">Cardiology</option>
+                    <option value="2">Neurology</option>
+                    <option value="3">Orthopedics</option>
+                    <option value="4">Psychiatry</option>
+                    <option value="5">Surgery</option>
+                    <option value="6">Pediatrics</option>
+                    <option value="7">Dermatology</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Specific Doctor (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Dr. Smith, Dr. Johnson, etc."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* External Referral Fields */}
+          {formData.referral_type === 'external' && (
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200 mb-4">
+              <h5 className="font-medium text-orange-900 mb-3">External Referral Details</h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Facility Name *</label>
+                  <input
+                    type="text"
+                    name="referral_facility"
+                    value={formData.referral_facility || ''}
+                    onChange={handleInputChange}
+                    required={formData.referral_type === 'external'}
+                    placeholder="General Hospital, Specialist Clinic, etc."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Facility Type</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select type...</option>
+                    <option value="hospital">Hospital</option>
+                    <option value="specialist_clinic">Specialist Clinic</option>
+                    <option value="diagnostic_center">Diagnostic Center</option>
+                    <option value="rehabilitation">Rehabilitation Center</option>
+                    <option value="mental_health">Mental Health Facility</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Referral Reason (for both internal and external) */}
+          {(formData.referral_type as string) !== 'none' && (
+            <div className="mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Reason for Referral *</label>
+                  <textarea
+                    name="referral_reason"
+                    value={formData.referral_reason || ''}
+                    onChange={handleInputChange}
+                    required={(formData.referral_type as string) !== 'none'}
+                    rows={3}
+                    placeholder="Describe why the patient needs to be referred..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Urgency Level</label>
+                  <select
+                    name="referral_urgency"
+                    value={formData.referral_urgency || 'routine'}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="routine">Routine (within 2 weeks)</option>
+                    <option value="urgent">Urgent (within 2-3 days)</option>
+                    <option value="emergency">Emergency (immediate)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Submit Buttons */}

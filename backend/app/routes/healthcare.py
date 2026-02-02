@@ -11,10 +11,11 @@ from app.utils.data_isolation import (
     medical_record_service, 
     department_service,
     lab_test_service,
+    referral_service,
     organization_required,
     organization_access_required
 )
-from app.models import Patient, Appointment, MedicalRecord, Department, LabTest
+from app.models import Patient, Appointment, MedicalRecord, Department, LabTest, Referral
 from datetime import datetime, date
 import traceback
 
@@ -247,7 +248,40 @@ def create_medical_record():
             except Exception as e:
                 print(f"Warning: Could not update lab test status: {e}")
         
-        return jsonify({
+        # Handle referral creation if referral_type is not 'none'
+        referral_id = None
+        if data.get('referral_type') and data['referral_type'] != 'none':
+            try:
+                referral_data = {
+                    'organization_id': org_id,
+                    'medical_record_id': record.id,
+                    'patient_id': data['patient_id'],
+                    'referring_doctor_id': current_user_id,
+                    'referral_type': data['referral_type'],
+                    'reason': data.get('referral_reason', ''),
+                    'urgency': data.get('referral_urgency', 'routine')
+                }
+                
+                # Add internal referral fields
+                if data['referral_type'] == 'internal':
+                    if data.get('referral_doctor_id'):
+                        referral_data['referred_doctor_id'] = data['referral_doctor_id']
+                    if data.get('referral_department_id'):
+                        referral_data['department_id'] = data['referral_department_id']
+                
+                # Add external referral fields
+                elif data['referral_type'] == 'external':
+                    referral_data['facility_name'] = data.get('referral_facility')
+                    referral_data['facility_type'] = data.get('facility_type')
+                    referral_data['facility_contact'] = data.get('facility_contact')
+                    referral_data['facility_address'] = data.get('facility_address')
+                
+                referral = referral_service.create(referral_data)
+                referral_id = referral.id
+            except Exception as e:
+                print(f"Warning: Could not create referral: {e}")
+        
+        response_data = {
             'message': 'Medical record created successfully',
             'medical_record': {
                 'id': record.id,
@@ -255,7 +289,13 @@ def create_medical_record():
                 'diagnosis': record.diagnosis,
                 'treatment_plan': record.treatment_plan
             }
-        }), 201
+        }
+        
+        if referral_id:
+            response_data['referral_created'] = True
+            response_data['referral_id'] = referral_id
+        
+        return jsonify(response_data), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -521,6 +561,82 @@ def update_lab_test(test_id):
                 'status': lab_test.status,
                 'result_value': lab_test.result_value,
                 'abnormal_flag': lab_test.abnormal_flag
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+# Referral routes
+@bp.route('/referrals', methods=['GET'])
+@jwt_required()
+@organization_required
+def get_referrals():
+    """Get referrals for the current organization"""
+    try:
+        referral_type = request.args.get('type')  # 'made' or 'received'
+        claims = get_jwt()
+        current_user_id = claims.get('user_id')
+        
+        if referral_type == 'made':
+            referrals = referral_service.get_by_referring_doctor(current_user_id)
+        elif referral_type == 'received':
+            referrals = referral_service.get_by_referred_doctor(current_user_id)
+        else:
+            referrals = referral_service.get_all()
+        
+        return jsonify({
+            'referrals': [{
+                'id': ref.id,
+                'patient_id': ref.patient_id,
+                'patient_name': f"{ref.patient.first_name} {ref.patient.last_name}" if ref.patient else None,
+                'referring_doctor_name': f"Dr. {ref.referring_doctor.first_name} {ref.referring_doctor.last_name}" if ref.referring_doctor else None,
+                'referred_doctor_name': f"Dr. {ref.referred_doctor.first_name} {ref.referred_doctor.last_name}" if ref.referred_doctor else None,
+                'department_name': ref.department.name if ref.department else None,
+                'referral_type': ref.referral_type,
+                'facility_name': ref.facility_name,
+                'facility_type': ref.facility_type,
+                'reason': ref.reason,
+                'urgency': ref.urgency,
+                'status': ref.status,
+                'notes': ref.notes,
+                'created_at': ref.created_at.isoformat(),
+                'scheduled_date': ref.scheduled_date.isoformat() if ref.scheduled_date else None
+            } for ref in referrals],
+            'total': len(referrals)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/referrals/<int:referral_id>', methods=['PUT'])
+@jwt_required()
+@organization_access_required(Referral)
+def update_referral(referral_id):
+    """Update a referral status (organization-scoped)"""
+    try:
+        referral = referral_service.get_by_id(referral_id)
+        if not referral:
+            return jsonify({'error': 'Referral not found'}), 404
+        
+        data = request.get_json()
+        
+        # Update allowed fields
+        updatable_fields = ['status', 'notes', 'scheduled_date']
+        
+        for field in updatable_fields:
+            if field in data:
+                if field == 'scheduled_date' and data[field]:
+                    setattr(referral, field, datetime.fromisoformat(data[field].replace('Z', '+00:00')))
+                else:
+                    setattr(referral, field, data[field])
+        
+        referral_service.update(referral)
+        
+        return jsonify({
+            'message': 'Referral updated successfully',
+            'referral': {
+                'id': referral.id,
+                'status': referral.status,
+                'notes': referral.notes
             }
         })
     except Exception as e:

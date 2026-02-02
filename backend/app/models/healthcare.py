@@ -324,6 +324,55 @@ class LabTest(db.Model):
         db.Index('idx_lab_test_org_date', 'organization_id', 'ordered_at'),
     )
 
+class Referral(db.Model):
+    """Patient referrals to other doctors or facilities"""
+    __tablename__ = 'referrals'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    
+    # Core referral information
+    medical_record_id = db.Column(db.Integer, db.ForeignKey('medical_records.id'), nullable=False)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
+    referring_doctor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    referral_type = db.Column(db.Enum('internal', 'external', name='referral_types'), nullable=False)
+    
+    # Internal referral fields
+    referred_doctor_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'))
+    
+    # External referral fields
+    facility_name = db.Column(db.String(200))
+    facility_type = db.Column(db.String(100))  # hospital, clinic, specialist, etc.
+    facility_contact = db.Column(db.String(100))  # phone/email
+    facility_address = db.Column(db.Text)
+    
+    # Common fields
+    reason = db.Column(db.Text, nullable=False)
+    urgency = db.Column(db.Enum('routine', 'urgent', 'emergency', name='referral_urgency'), nullable=False, default='routine')
+    status = db.Column(db.Enum('pending', 'accepted', 'completed', 'cancelled', name='referral_status'), nullable=False, default='pending')
+    notes = db.Column(db.Text)
+    scheduled_date = db.Column(db.DateTime)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    organization = db.relationship('Organization', backref=db.backref('referrals', lazy='dynamic'))
+    medical_record = db.relationship('MedicalRecord', backref='referral', uselist=False)
+    patient = db.relationship('Patient', backref='referrals')
+    referring_doctor = db.relationship('User', foreign_keys=[referring_doctor_id], backref='referrals_made')
+    referred_doctor = db.relationship('User', foreign_keys=[referred_doctor_id], backref='referrals_received')
+    department = db.relationship('Department', backref='referrals')
+    
+    # Indexes for efficient querying
+    __table_args__ = (
+        db.Index('idx_referral_org_patient', 'organization_id', 'patient_id'),
+        db.Index('idx_referral_org_status', 'organization_id', 'status'),
+        db.Index('idx_referral_org_doctor', 'organization_id', 'referred_doctor_id'),
+    )
+
 class QueueManagement(db.Model):
     """Daily queue management for organizations"""
     __tablename__ = 'queue_management'
@@ -385,6 +434,7 @@ class QueueManagement(db.Model):
 @event.listens_for(MedicalRecord, 'before_insert')
 @event.listens_for(Triage, 'before_insert')
 @event.listens_for(LabTest, 'before_insert')
+@event.listens_for(Referral, 'before_insert')
 @event.listens_for(QueueManagement, 'before_insert')
 def validate_organization_before_insert(mapper, connection, target):
     """Ensure organization_id is always set before inserting records"""

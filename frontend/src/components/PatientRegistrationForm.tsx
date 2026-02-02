@@ -1,1 +1,212 @@
-import React, { useState } from 'react';\nimport { Patient } from '@/types';\n\ninterface PatientRegistrationFormProps {\n  onSubmit: (patientData: Partial<Patient>) => Promise<void>;\n  onCancel: () => void;\n  loading?: boolean;\n}\n\nexport default function PatientRegistrationForm({ \n  onSubmit, \n  onCancel, \n  loading = false \n}: PatientRegistrationFormProps) {\n  const [formData, setFormData] = useState({\n    first_name: '',\n    last_name: '',\n    date_of_birth: '',\n    gender: 'male' as const,\n    phone: '',\n    email: '',\n    address: '',\n    emergency_contact: '',\n    emergency_phone: '',\n    blood_type: '',\n    allergies: '',\n    chronic_conditions: '',\n    current_medications: '',\n    insurance_info: '',\n    visit_type: 'walk_in' as const\n  });\n\n  const [errors, setErrors] = useState<Record<string, string>>({});\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {\n    const { name, value } = e.target;\n    setFormData(prev => ({ ...prev, [name]: value }));\n    // Clear error when user starts typing\n    if (errors[name]) {\n      setErrors(prev => ({ ...prev, [name]: '' }));\n    }\n  };\n\n  const validateForm = () => {\n    const newErrors: Record<string, string> = {};\n\n    if (!formData.first_name.trim()) {\n      newErrors.first_name = 'First name is required';\n    }\n    if (!formData.last_name.trim()) {\n      newErrors.last_name = 'Last name is required';\n    }\n    if (!formData.date_of_birth) {\n      newErrors.date_of_birth = 'Date of birth is required';\n    }\n    if (!formData.phone.trim()) {\n      newErrors.phone = 'Phone number is required';\n    }\n\n    setErrors(newErrors);\n    return Object.keys(newErrors).length === 0;\n  };\n\n  const handleSubmit = async (e: React.FormEvent) => {\n    e.preventDefault();\n    if (validateForm()) {\n      try {\n        await onSubmit(formData);\n      } catch (error) {\n        console.error('Registration failed:', error);\n      }\n    }\n  };\n\n  return (\n    <div className=\"bg-white p-6 rounded-lg shadow-lg\">\n      <div className=\"flex justify-between items-center mb-6\">\n        <h2 className=\"text-2xl font-bold text-gray-900\">Patient Registration</h2>\n        <button\n          onClick={onCancel}\n          className=\"text-gray-500 hover:text-gray-700\"\n        >\n          <svg className=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\">\n            <path strokeLinecap=\"round\" strokeLinejoin=\"round\" strokeWidth={2} d=\"M6 18L18 6M6 6l12 12\" />\n          </svg>\n        </button>\n      </div>\n\n      <form onSubmit={handleSubmit} className=\"space-y-6\">\n        <div className=\"grid grid-cols-1 md:grid-cols-2 gap-6\">\n          {/* Personal Information */}\n          <div className=\"space-y-4\">\n            <h3 className=\"text-lg font-medium text-gray-900\">Personal Information</h3>\n            \n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">First Name *</label>\n              <input\n                type=\"text\"\n                name=\"first_name\"\n                value={formData.first_name}\n                onChange={handleChange}\n                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${\n                  errors.first_name ? 'border-red-500' : ''\n                }`}\n              />\n              {errors.first_name && <p className=\"mt-1 text-sm text-red-600\">{errors.first_name}</p>}\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Last Name *</label>\n              <input\n                type=\"text\"\n                name=\"last_name\"\n                value={formData.last_name}\n                onChange={handleChange}\n                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${\n                  errors.last_name ? 'border-red-500' : ''\n                }`}\n              />\n              {errors.last_name && <p className=\"mt-1 text-sm text-red-600\">{errors.last_name}</p>}\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Date of Birth *</label>\n              <input\n                type=\"date\"\n                name=\"date_of_birth\"\n                value={formData.date_of_birth}\n                onChange={handleChange}\n                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${\n                  errors.date_of_birth ? 'border-red-500' : ''\n                }`}\n              />\n              {errors.date_of_birth && <p className=\"mt-1 text-sm text-red-600\">{errors.date_of_birth}</p>}\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Gender</label>\n              <select\n                name=\"gender\"\n                value={formData.gender}\n                onChange={handleChange}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n              >\n                <option value=\"male\">Male</option>\n                <option value=\"female\">Female</option>\n                <option value=\"other\">Other</option>\n              </select>\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Blood Type</label>\n              <select\n                name=\"blood_type\"\n                value={formData.blood_type}\n                onChange={handleChange}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n              >\n                <option value=\"\">Select blood type</option>\n                <option value=\"A+\">A+</option>\n                <option value=\"A-\">A-</option>\n                <option value=\"B+\">B+</option>\n                <option value=\"B-\">B-</option>\n                <option value=\"AB+\">AB+</option>\n                <option value=\"AB-\">AB-</option>\n                <option value=\"O+\">O+</option>\n                <option value=\"O-\">O-</option>\n              </select>\n            </div>\n          </div>\n\n          {/* Contact Information */}\n          <div className=\"space-y-4\">\n            <h3 className=\"text-lg font-medium text-gray-900\">Contact Information</h3>\n            \n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Phone Number *</label>\n              <input\n                type=\"tel\"\n                name=\"phone\"\n                value={formData.phone}\n                onChange={handleChange}\n                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${\n                  errors.phone ? 'border-red-500' : ''\n                }`}\n              />\n              {errors.phone && <p className=\"mt-1 text-sm text-red-600\">{errors.phone}</p>}\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Email</label>\n              <input\n                type=\"email\"\n                name=\"email\"\n                value={formData.email}\n                onChange={handleChange}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n              />\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Address</label>\n              <textarea\n                name=\"address\"\n                value={formData.address}\n                onChange={handleChange}\n                rows={2}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n              />\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Emergency Contact</label>\n              <input\n                type=\"text\"\n                name=\"emergency_contact\"\n                value={formData.emergency_contact}\n                onChange={handleChange}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n                placeholder=\"Contact person name\"\n              />\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Emergency Phone</label>\n              <input\n                type=\"tel\"\n                name=\"emergency_phone\"\n                value={formData.emergency_phone}\n                onChange={handleChange}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n              />\n            </div>\n          </div>\n        </div>\n\n        {/* Medical Information */}\n        <div className=\"space-y-4\">\n          <h3 className=\"text-lg font-medium text-gray-900\">Medical Information</h3>\n          \n          <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Known Allergies</label>\n              <textarea\n                name=\"allergies\"\n                value={formData.allergies}\n                onChange={handleChange}\n                rows={2}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n                placeholder=\"List any known allergies\"\n              />\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Chronic Conditions</label>\n              <textarea\n                name=\"chronic_conditions\"\n                value={formData.chronic_conditions}\n                onChange={handleChange}\n                rows={2}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n                placeholder=\"List any chronic conditions\"\n              />\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Current Medications</label>\n              <textarea\n                name=\"current_medications\"\n                value={formData.current_medications}\n                onChange={handleChange}\n                rows={2}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n                placeholder=\"List current medications\"\n              />\n            </div>\n\n            <div>\n              <label className=\"block text-sm font-medium text-gray-700\">Insurance Information</label>\n              <textarea\n                name=\"insurance_info\"\n                value={formData.insurance_info}\n                onChange={handleChange}\n                rows={2}\n                className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n                placeholder=\"Insurance provider and policy details\"\n              />\n            </div>\n          </div>\n        </div>\n\n        {/* Visit Information */}\n        <div>\n          <h3 className=\"text-lg font-medium text-gray-900\">Visit Information</h3>\n          <div className=\"mt-4\">\n            <label className=\"block text-sm font-medium text-gray-700\">Visit Type</label>\n            <select\n              name=\"visit_type\"\n              value={formData.visit_type}\n              onChange={handleChange}\n              className=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500\"\n            >\n              <option value=\"walk_in\">Walk-in</option>\n              <option value=\"appointment\">Appointment</option>\n              <option value=\"emergency\">Emergency</option>\n              <option value=\"follow_up\">Follow-up</option>\n            </select>\n          </div>\n        </div>\n\n        {/* Form Actions */}\n        <div className=\"flex justify-end space-x-4 pt-6 border-t\">\n          <button\n            type=\"button\"\n            onClick={onCancel}\n            className=\"px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500\"\n            disabled={loading}\n          >\n            Cancel\n          </button>\n          <button\n            type=\"submit\"\n            className=\"px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed\"\n            disabled={loading}\n          >\n            {loading ? (\n              <div className=\"flex items-center\">\n                <svg className=\"animate-spin -ml-1 mr-3 h-5 w-5 text-white\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\">\n                  <circle className=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" strokeWidth=\"4\"></circle>\n                  <path className=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\"></path>\n                </svg>\n                Registering...\n              </div>\n            ) : (\n              'Register Patient'\n            )}\n          </button>\n        </div>\n      </form>\n    </div>\n  );\n}
+import React, { useState } from 'react';
+import { Patient } from '../types';
+
+interface PatientRegistrationFormProps {
+  onSubmit: (patientData: Partial<Patient>) => Promise<void>;
+  onCancel: () => void;
+  loading?: boolean;
+}
+
+export default function PatientRegistrationForm({ 
+  onSubmit, 
+  onCancel, 
+  loading = false 
+}: PatientRegistrationFormProps) {
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    date_of_birth: '',
+    gender: 'male' as const,
+    phone: '',
+    email: '',
+    address: '',
+    emergency_contact: '',
+    emergency_phone: '',
+    blood_type: '',
+    allergies: '',
+    chronic_conditions: '',
+    current_medications: '',
+    insurance_info: '',
+    visit_type: 'walk_in' as const
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.first_name.trim()) {
+      newErrors.first_name = 'First name is required';
+    }
+    if (!formData.last_name.trim()) {
+      newErrors.last_name = 'Last name is required';
+    }
+    if (!formData.date_of_birth) {
+      newErrors.date_of_birth = 'Date of birth is required';
+    }
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      try {
+        await onSubmit(formData);
+      } catch (error) {
+        console.error('Registration failed:', error);
+      }
+    }
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-lg">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Patient Registration</h2>
+        <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900">Personal Information</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700">First Name *</label>
+              <input
+                type="text"
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleChange}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${errors.first_name ? 'border-red-500' : ''}`}
+              />
+              {errors.first_name && <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Last Name *</label>
+              <input
+                type="text"
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleChange}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${errors.last_name ? 'border-red-500' : ''}`}
+              />
+              {errors.last_name && <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Date of Birth *</label>
+              <input
+                type="date"
+                name="date_of_birth"
+                value={formData.date_of_birth}
+                onChange={handleChange}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${errors.date_of_birth ? 'border-red-500' : ''}`}
+              />
+              {errors.date_of_birth && <p className="mt-1 text-sm text-red-600">{errors.date_of_birth}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Gender</label>
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900">Contact Information</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Phone Number *</label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${errors.phone ? 'border-red-500' : ''}`}
+              />
+              {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Address</label>
+              <textarea
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                rows={2}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Emergency Contact</label>
+              <input
+                type="text"
+                name="emergency_contact"
+                value={formData.emergency_contact}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                placeholder="Contact person name"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-4 pt-6 border-t">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            disabled={loading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            disabled={loading}
+          >
+            {loading ? 'Registering...' : 'Register Patient'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

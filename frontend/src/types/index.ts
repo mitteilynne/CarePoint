@@ -21,11 +21,7 @@ export interface AuthResponse {
 
 export interface LoginRequest {
   organization_code: string;
-<<<<<<< Updated upstream
   username: string;
-=======
-  login: string; // email or username
->>>>>>> Stashed changes
   password: string;
 }
 
@@ -175,6 +171,35 @@ export interface MedicalRecord {
   doctor_name?: string;
   patient_name?: string;
   lab_test_id?: number;
+  referral_type?: 'none' | 'internal' | 'external';
+  referral_doctor_id?: number;
+  referral_department_id?: number;
+  referral_facility?: string;
+  referral_reason?: string;
+  referral_urgency?: 'routine' | 'urgent' | 'emergency';
+}
+
+export interface Referral {
+  id?: number;
+  medical_record_id: number;
+  patient_id: number;
+  referring_doctor_id: number;
+  referral_type: 'internal' | 'external';
+  // Internal referral fields
+  referred_doctor_id?: number;
+  department_id?: number;
+  // External referral fields
+  facility_name?: string;
+  facility_type?: string;
+  facility_contact?: string;
+  facility_address?: string;
+  // Common fields
+  reason: string;
+  urgency: 'routine' | 'urgent' | 'emergency';
+  status: 'pending' | 'accepted' | 'completed' | 'cancelled';
+  notes?: string;
+  created_at?: string;
+  scheduled_date?: string;
 }
 
 export interface ApiError {
