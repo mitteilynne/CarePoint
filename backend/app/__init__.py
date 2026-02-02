@@ -20,9 +20,20 @@ def create_app(config_name='default'):
     CORS(app)
     
     # Register blueprints
-    from app.routes.auth import auth_bp
-    from app.routes.users import user_bp
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(user_bp, url_prefix='/api')
+    from app.routes.auth import bp as auth_bp
+    from app.routes.main import bp as main_bp
+    from app.routes.organization import bp as organization_bp
+    from app.routes.healthcare import bp as healthcare_bp
+    from app.routes.receptionist import bp as receptionist_bp
+    from app.routes.lab_technician import lab_technician_bp
+    from app.routes.notifications import notifications_bp
+    
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(main_bp)
+    app.register_blueprint(organization_bp)
+    app.register_blueprint(healthcare_bp)
+    app.register_blueprint(receptionist_bp)
+    app.register_blueprint(lab_technician_bp)
+    app.register_blueprint(notifications_bp)
     
     return app

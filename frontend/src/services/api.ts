@@ -45,4 +45,61 @@ export const generalAPI = {
   },
 };
 
+// Lab Technician API
+export const labTechnicianAPI = {
+  getLabTests: async (status?: string) => {
+    const params = status ? { status } : {};
+    const response = await api.get('/lab_technician/lab_tests', { params });
+    return response.data;
+  },
+
+  getLabTestDetails: async (testId: number) => {
+    const response = await api.get(`/lab_technician/lab_tests/${testId}`);
+    return response.data;
+  },
+
+  updateTestStatus: async (testId: number, status: string) => {
+    const response = await api.put(`/lab_technician/lab_tests/${testId}/status`, { status });
+    return response.data;
+  },
+
+  submitTestResults: async (testId: number, results: string) => {
+    const response = await api.put(`/lab_technician/lab_tests/${testId}/results`, { results });
+    return response.data;
+  },
+
+  getStats: async () => {
+    const response = await api.get('/lab_technician/stats');
+    return response.data;
+  },
+};
+
+// Notifications API
+export const notificationsAPI = {
+  getNotifications: async (filters?: { is_read?: boolean; type?: string; limit?: number }) => {
+    const response = await api.get('/notifications', { params: filters });
+    return response.data;
+  },
+
+  markAsRead: async (notificationId: number) => {
+    const response = await api.put(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+
+  markAllAsRead: async () => {
+    const response = await api.put('/notifications/mark-all-read');
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/unread-count');
+    return response.data;
+  },
+
+  getLabResults: async () => {
+    const response = await api.get('/notifications/lab-results');
+    return response.data;
+  },
+};
+
 export default api;

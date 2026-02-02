@@ -2,6 +2,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import ReceptionistDashboard from './ReceptionistDashboard';
 import DoctorDashboard from './DoctorDashboard';
+import LabTechnicianDashboard from './LabTechnicianDashboard';
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -10,6 +11,10 @@ export default function Dashboard() {
     return <Navigate to="/login" replace />;
   }
 
+  // Debug: Log the user role
+  console.log('User role:', user?.role);
+  console.log('Full user object:', user);
+
   // Route to specific dashboard based on user role
   if (user?.role === 'receptionist') {
     return <ReceptionistDashboard />;
@@ -17,6 +22,10 @@ export default function Dashboard() {
   
   if (user?.role === 'doctor') {
     return <DoctorDashboard />;
+  }
+
+  if (user?.role === 'lab_technician') {
+    return <LabTechnicianDashboard />;
   }
 
   return (
