@@ -124,10 +124,10 @@ def login():
 
         # Create tokens
         access_token = create_access_token(
-            identity=user.id,
+            identity=str(user.id),  # Convert to string
             expires_delta=timedelta(hours=24)
         )
-        refresh_token = create_refresh_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=str(user.id))  # Convert to string
         
         logger.info(f"User logged in: {user.email}")
         
