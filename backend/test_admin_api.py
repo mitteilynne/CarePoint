@@ -60,6 +60,27 @@ def test_admin_endpoints(token):
         print(f"Organization: {json.dumps(data, indent=2)}")
     else:
         print(f"Error: {response.text}")
+    
+    print("\n=== Testing Doctors Summary ===")
+    response = requests.get(f'{API_BASE_URL}/admin/doctors/summary', headers=headers)
+    print(f"Status: {response.status_code}")
+    if response.status_code == 200:
+        data = response.json()
+        print(f"Doctors Summary: {json.dumps(data, indent=2)}")
+        
+        # Test doctor details if we have doctors
+        if data.get('doctors'):
+            doctor_id = data['doctors'][0]['id']
+            print(f"\n=== Testing Doctor {doctor_id} Statistics ===")
+            response = requests.get(f'{API_BASE_URL}/admin/doctors/{doctor_id}/statistics', headers=headers)
+            print(f"Status: {response.status_code}")
+            if response.status_code == 200:
+                doctor_data = response.json()
+                print(f"Doctor Statistics: {json.dumps(doctor_data, indent=2)}")
+            else:
+                print(f"Error: {response.text}")
+    else:
+        print(f"Error: {response.text}")
 
 if __name__ == '__main__':
     print("Testing Admin API Endpoints")

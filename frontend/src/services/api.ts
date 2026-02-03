@@ -149,6 +149,18 @@ export const adminAPI = {
     const response = await api.get('/admin/organization/info');
     return response.data;
   },
+
+  getDoctorStatistics: async (doctorId: number, days?: number) => {
+    const params = days ? { days } : {};
+    const response = await api.get(`/admin/doctors/${doctorId}/statistics`, { params });
+    return response.data;
+  },
+
+  getDoctorsSummary: async (days?: number) => {
+    const params = days ? { days } : {};
+    const response = await api.get('/admin/doctors/summary', { params });
+    return response.data;
+  },
 };
 
 export default api;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
+import DoctorDetailsModal from '@/components/DoctorDetailsModal';
 
 interface User {
   id: number;
@@ -32,6 +33,18 @@ interface OrganizationInfo {
   created_at: string;
 }
 
+interface DoctorSummary {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  is_active: boolean;
+  patients_count: number;
+  visits_count: number;
+  lab_tests_count: number;
+  prescriptions_count: number;
+}
+
 interface PaginationInfo {
   page: number;
   per_page: number;
@@ -50,6 +63,8 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [organizationInfo, setOrganizationInfo] = useState<OrganizationInfo | null>(null);
+  const [doctorsSummary, setDoctorsSummary] = useState<DoctorSummary[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   
@@ -64,6 +79,8 @@ export default function AdminDashboard() {
       loadOverview();
     } else if (currentView === 'organization') {
       loadOrganizationInfo();
+    } else if (currentView === 'doctors') {
+      loadDoctorsSummary();
     } else {
       loadUsers();
     }
@@ -127,6 +144,21 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error loading organization info:', error);
       setMessage({ type: 'error', text: 'Failed to load organization info' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDoctorsSummary = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/admin/doctors/summary', { 
+        params: { days: 30 }
+      });
+      setDoctorsSummary(response.data.doctors);
+    } catch (error) {
+      console.error('Error loading doctors summary:', error);
+      setMessage({ type: 'error', text: 'Failed to load doctors summary' });
     } finally {
       setLoading(false);
     }
@@ -467,6 +499,112 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const renderDoctorsView = () => (
+    <div className="space-y-4">
+      <div className="bg-white p-4 rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold mb-4">Doctors Activity Summary (Last 30 days)</h3>
+        {doctorsSummary.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Doctor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Patients
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Visits
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Lab Tests
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Prescriptions
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {doctorsSummary.map((doctor) => (
+                  <tr key={doctor.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {doctor.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {doctor.email}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {doctor.patients_count}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {doctor.visits_count}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                        {doctor.lab_tests_count}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        {doctor.prescriptions_count}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        doctor.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {doctor.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => setSelectedDoctorId(doctor.id)}
+                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                      >
+                        View Details
+                      </button>
+                      <button
+                        onClick={() => toggleUserStatus(doctor.id)}
+                        className={`${
+                          doctor.is_active
+                            ? 'text-red-600 hover:text-red-900'
+                            : 'text-green-600 hover:text-green-900'
+                        }`}
+                      >
+                        {doctor.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            No doctors found in this organization
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   if (!user || user.role !== 'admin') {
     return (
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -545,11 +683,20 @@ export default function AdminDashboard() {
         ) : (
           <div>
             {currentView === 'overview' && renderOverview()}
-            {(currentView === 'users' || currentView === 'doctors' || 
-              currentView === 'receptionists' || currentView === 'lab_technicians') && 
+            {currentView === 'users' && renderUserTable()}
+            {currentView === 'doctors' && renderDoctorsView()}
+            {(currentView === 'receptionists' || currentView === 'lab_technicians') && 
               renderUserTable()}
             {currentView === 'organization' && renderOrganization()}
           </div>
+        )}
+
+        {/* Doctor Details Modal */}
+        {selectedDoctorId && (
+          <DoctorDetailsModal
+            doctorId={selectedDoctorId}
+            onBack={() => setSelectedDoctorId(null)}
+          />
         )}
       </div>
     </div>

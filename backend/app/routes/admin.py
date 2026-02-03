@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from functools import wraps
 from app import db
 from app.models import User, Organization
+from app.models.healthcare import Patient, MedicalRecord, LabTest
 from sqlalchemy import func, case, and_, or_
 from datetime import datetime, timedelta
 import logging
@@ -322,3 +323,201 @@ def get_organization_info():
     except Exception as e:
         logger.error(f"Error getting organization info: {str(e)}")
         return jsonify({'error': 'Failed to get organization info'}), 500
+
+@bp.route('/doctors/<int:doctor_id>/statistics', methods=['GET'])
+@jwt_required()
+def get_doctor_statistics(doctor_id):
+    """Get detailed statistics for a specific doctor"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        admin_user = User.query.get(current_user_id)
+        
+        if not admin_user or admin_user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        org_id = admin_user.organization_id
+        
+        # Verify doctor exists and belongs to same organization
+        doctor = User.query.filter(
+            User.id == doctor_id,
+            User.organization_id == org_id,
+            User.role == 'doctor'
+        ).first()
+        
+        if not doctor:
+            return jsonify({'error': 'Doctor not found'}), 404
+        
+        # Get time period from query params (default to last 30 days)
+        days = request.args.get('days', 30, type=int)
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Get patients seen by this doctor
+        patients_query = db.session.query(
+            Patient.id,
+            Patient.first_name,
+            Patient.last_name,
+            Patient.patient_id,
+            func.count(MedicalRecord.id).label('visit_count'),
+            func.max(MedicalRecord.visit_date).label('last_visit')
+        ).join(
+            MedicalRecord, Patient.id == MedicalRecord.patient_id
+        ).filter(
+            MedicalRecord.doctor_id == doctor_id,
+            MedicalRecord.organization_id == org_id,
+            MedicalRecord.visit_date >= start_date
+        ).group_by(
+            Patient.id, Patient.first_name, Patient.last_name, Patient.patient_id
+        ).all()
+        
+        # Get total statistics
+        total_patients = len(patients_query)
+        total_visits = sum(p.visit_count for p in patients_query)
+        
+        # Get lab tests ordered
+        lab_tests = db.session.query(
+            func.count(LabTest.id).label('total_tests'),
+            LabTest.test_type,
+            func.count(case((LabTest.status == 'completed', 1), else_=None)).label('completed_tests'),
+            func.count(case((LabTest.status == 'pending', 1), else_=None)).label('pending_tests')
+        ).filter(
+            LabTest.doctor_id == doctor_id,
+            LabTest.organization_id == org_id,
+            LabTest.ordered_at >= start_date
+        ).group_by(LabTest.test_type).all()
+        
+        total_lab_tests = db.session.query(func.count(LabTest.id)).filter(
+            LabTest.doctor_id == doctor_id,
+            LabTest.organization_id == org_id,
+            LabTest.ordered_at >= start_date
+        ).scalar()
+        
+        # Get prescriptions (from medical records)
+        prescriptions_count = db.session.query(func.count(MedicalRecord.id)).filter(
+            MedicalRecord.doctor_id == doctor_id,
+            MedicalRecord.organization_id == org_id,
+            MedicalRecord.visit_date >= start_date,
+            MedicalRecord.medications_prescribed.isnot(None),
+            MedicalRecord.medications_prescribed != ''
+        ).scalar()
+        
+        # Format patients data
+        patients_data = []
+        for p in patients_query:
+            patients_data.append({
+                'id': p.id,
+                'patient_id': p.patient_id,
+                'name': f"{p.first_name} {p.last_name}",
+                'visit_count': p.visit_count,
+                'last_visit': p.last_visit.isoformat() if p.last_visit else None
+            })
+        
+        # Format lab tests data
+        lab_tests_data = []
+        for test in lab_tests:
+            lab_tests_data.append({
+                'test_type': test.test_type,
+                'total': test.total_tests,
+                'completed': test.completed_tests,
+                'pending': test.pending_tests
+            })
+        
+        return jsonify({
+            'doctor': {
+                'id': doctor.id,
+                'name': f"{doctor.first_name} {doctor.last_name}",
+                'email': doctor.email
+            },
+            'period_days': days,
+            'statistics': {
+                'total_patients': total_patients,
+                'total_visits': total_visits,
+                'total_lab_tests': total_lab_tests,
+                'total_prescriptions': prescriptions_count
+            },
+            'patients': patients_data,
+            'lab_tests_by_type': lab_tests_data
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting doctor statistics: {str(e)}")
+        return jsonify({'error': 'Failed to get doctor statistics'}), 500
+
+@bp.route('/doctors/summary', methods=['GET'])
+@jwt_required()
+def get_doctors_summary():
+    """Get summary statistics for all doctors in the organization"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        admin_user = User.query.get(current_user_id)
+        
+        if not admin_user or admin_user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        org_id = admin_user.organization_id
+        
+        # Get time period from query params (default to last 30 days)
+        days = request.args.get('days', 30, type=int)
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Get all doctors in the organization
+        doctors = User.query.filter(
+            User.organization_id == org_id,
+            User.role == 'doctor',
+            User.is_active == True
+        ).all()
+        
+        doctors_summary = []
+        
+        for doctor in doctors:
+            # Count patients seen
+            patients_count = db.session.query(
+                func.count(func.distinct(MedicalRecord.patient_id))
+            ).filter(
+                MedicalRecord.doctor_id == doctor.id,
+                MedicalRecord.organization_id == org_id,
+                MedicalRecord.visit_date >= start_date
+            ).scalar()
+            
+            # Count total visits
+            visits_count = db.session.query(func.count(MedicalRecord.id)).filter(
+                MedicalRecord.doctor_id == doctor.id,
+                MedicalRecord.organization_id == org_id,
+                MedicalRecord.visit_date >= start_date
+            ).scalar()
+            
+            # Count lab tests ordered
+            lab_tests_count = db.session.query(func.count(LabTest.id)).filter(
+                LabTest.doctor_id == doctor.id,
+                LabTest.organization_id == org_id,
+                LabTest.ordered_at >= start_date
+            ).scalar()
+            
+            # Count prescriptions
+            prescriptions_count = db.session.query(func.count(MedicalRecord.id)).filter(
+                MedicalRecord.doctor_id == doctor.id,
+                MedicalRecord.organization_id == org_id,
+                MedicalRecord.visit_date >= start_date,
+                MedicalRecord.medications_prescribed.isnot(None),
+                MedicalRecord.medications_prescribed != ''
+            ).scalar()
+            
+            doctors_summary.append({
+                'id': doctor.id,
+                'name': f"{doctor.first_name} {doctor.last_name}",
+                'email': doctor.email,
+                'username': doctor.username,
+                'is_active': doctor.is_active,
+                'patients_count': patients_count or 0,
+                'visits_count': visits_count or 0,
+                'lab_tests_count': lab_tests_count or 0,
+                'prescriptions_count': prescriptions_count or 0
+            })
+        
+        return jsonify({
+            'period_days': days,
+            'doctors': doctors_summary
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting doctors summary: {str(e)}")
+        return jsonify({'error': 'Failed to get doctors summary'}), 500
