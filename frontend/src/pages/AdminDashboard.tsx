@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
 import DoctorDetailsModal from '@/components/DoctorDetailsModal';
+import LabTechDetailsModal from '@/components/LabTechDetailsModal';
+import ReceptionistDetailsModal from '@/components/ReceptionistDetailsModal';
 
 interface User {
   id: number;
@@ -45,6 +47,28 @@ interface DoctorSummary {
   prescriptions_count: number;
 }
 
+interface LabTechnicianSummary {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  is_active: boolean;
+  assigned_tests_count: number;
+  completed_tests_count: number;
+  pending_tests_count: number;
+  efficiency_percentage: number;
+}
+
+interface ReceptionistSummary {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  is_active: boolean;
+  patients_registered: number;
+  appointments_scheduled: number;
+}
+
 interface PaginationInfo {
   page: number;
   per_page: number;
@@ -64,7 +88,11 @@ export default function AdminDashboard() {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [organizationInfo, setOrganizationInfo] = useState<OrganizationInfo | null>(null);
   const [doctorsSummary, setDoctorsSummary] = useState<DoctorSummary[]>([]);
+  const [labTechsSummary, setLabTechsSummary] = useState<LabTechnicianSummary[]>([]);
+  const [receptionistsSummary, setReceptionistsSummary] = useState<ReceptionistSummary[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
+  const [selectedLabTechId, setSelectedLabTechId] = useState<number | null>(null);
+  const [selectedReceptionistId, setSelectedReceptionistId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   
@@ -81,6 +109,10 @@ export default function AdminDashboard() {
       loadOrganizationInfo();
     } else if (currentView === 'doctors') {
       loadDoctorsSummary();
+    } else if (currentView === 'lab_technicians') {
+      loadLabTechsSummary();
+    } else if (currentView === 'receptionists') {
+      loadReceptionistsSummary();
     } else {
       loadUsers();
     }
@@ -152,13 +184,43 @@ export default function AdminDashboard() {
   const loadDoctorsSummary = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/doctors/summary', { 
+      const response = await api.get('/admin/doctors', { 
         params: { days: 30 }
       });
       setDoctorsSummary(response.data.doctors);
     } catch (error) {
       console.error('Error loading doctors summary:', error);
       setMessage({ type: 'error', text: 'Failed to load doctors summary' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLabTechsSummary = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/admin/lab-technicians', { 
+        params: { days: 30 }
+      });
+      setLabTechsSummary(response.data.lab_technicians);
+    } catch (error) {
+      console.error('Error loading lab technicians summary:', error);
+      setMessage({ type: 'error', text: 'Failed to load lab technicians summary' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadReceptionistsSummary = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/admin/receptionists', { 
+        params: { days: 30 }
+      });
+      setReceptionistsSummary(response.data.receptionists);
+    } catch (error) {
+      console.error('Error loading receptionists summary:', error);
+      setMessage({ type: 'error', text: 'Failed to load receptionists summary' });
     } finally {
       setLoading(false);
     }
@@ -605,6 +667,208 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const renderLabTechniciansView = () => (
+    <div className="space-y-4">
+      <div className="bg-white p-4 rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold mb-4">Lab Technicians Activity Summary (Last 30 days)</h3>
+        {labTechsSummary.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Lab Technician
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Assigned Tests
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Completed
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pending
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Efficiency
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {labTechsSummary.map((tech) => (
+                  <tr key={tech.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {tech.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {tech.email}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {tech.assigned_tests_count}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {tech.completed_tests_count}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        {tech.pending_tests_count}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        tech.efficiency_percentage >= 80 
+                          ? 'bg-green-100 text-green-800'
+                          : tech.efficiency_percentage >= 60
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {tech.efficiency_percentage}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        tech.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {tech.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => setSelectedLabTechId(tech.id)}
+                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                      >
+                        View Details
+                      </button>
+                      <button
+                        onClick={() => toggleUserStatus(tech.id)}
+                        className={`${
+                          tech.is_active
+                            ? 'text-red-600 hover:text-red-900'
+                            : 'text-green-600 hover:text-green-900'
+                        }`}
+                      >
+                        {tech.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            No lab technicians found in this organization
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderReceptionistsView = () => (
+    <div className="space-y-4">
+      <div className="bg-white p-4 rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold mb-4">Receptionists Activity Summary (Last 30 days)</h3>
+        {receptionistsSummary.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Receptionist
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Patients Registered
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Appointments Scheduled
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {receptionistsSummary.map((receptionist) => (
+                  <tr key={receptionist.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {receptionist.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {receptionist.email}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {receptionist.patients_registered}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {receptionist.appointments_scheduled}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        receptionist.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {receptionist.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => setSelectedReceptionistId(receptionist.id)}
+                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                      >
+                        View Details
+                      </button>
+                      <button
+                        onClick={() => toggleUserStatus(receptionist.id)}
+                        className={`${
+                          receptionist.is_active
+                            ? 'text-red-600 hover:text-red-900'
+                            : 'text-green-600 hover:text-green-900'
+                        }`}
+                      >
+                        {receptionist.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            No receptionists found in this organization
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   if (!user || user.role !== 'admin') {
     return (
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -685,17 +949,37 @@ export default function AdminDashboard() {
             {currentView === 'overview' && renderOverview()}
             {currentView === 'users' && renderUserTable()}
             {currentView === 'doctors' && renderDoctorsView()}
-            {(currentView === 'receptionists' || currentView === 'lab_technicians') && 
-              renderUserTable()}
+            {currentView === 'lab_technicians' && renderLabTechniciansView()}
+            {currentView === 'receptionists' && renderReceptionistsView()}
             {currentView === 'organization' && renderOrganization()}
           </div>
         )}
 
-        {/* Doctor Details Modal */}
+        {/* Detail Modals */}
         {selectedDoctorId && (
           <DoctorDetailsModal
             doctorId={selectedDoctorId}
-            onBack={() => setSelectedDoctorId(null)}
+            doctorName={doctorsSummary.find(d => d.id === selectedDoctorId)?.name || ''}
+            isOpen={!!selectedDoctorId}
+            onClose={() => setSelectedDoctorId(null)}
+          />
+        )}
+        
+        {selectedLabTechId && (
+          <LabTechDetailsModal
+            techId={selectedLabTechId}
+            techName={labTechsSummary.find(t => t.id === selectedLabTechId)?.name || ''}
+            isOpen={!!selectedLabTechId}
+            onClose={() => setSelectedLabTechId(null)}
+          />
+        )}
+        
+        {selectedReceptionistId && (
+          <ReceptionistDetailsModal
+            receptionistId={selectedReceptionistId}
+            receptionistName={receptionistsSummary.find(r => r.id === selectedReceptionistId)?.name || ''}
+            isOpen={!!selectedReceptionistId}
+            onClose={() => setSelectedReceptionistId(null)}
           />
         )}
       </div>

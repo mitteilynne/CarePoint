@@ -208,8 +208,8 @@ def create_demo_patients(demo_org):
             phone=patient_data['phone'],
             email=patient_data['email'],
             address=patient_data['address'],
-            emergency_contact_name=patient_data['emergency_contact_name'],
-            emergency_contact_phone=patient_data['emergency_contact_phone'],
+            emergency_contact=patient_data['emergency_contact_name'],
+            emergency_phone=patient_data['emergency_contact_phone'],
             visit_type=patient_data['visit_type'],
             registration_status=patient_data['registration_status'],
             registration_date=date.today()

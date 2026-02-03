@@ -40,6 +40,8 @@ class Patient(db.Model):
                           nullable=False, default='walk_in')
     current_queue_number = db.Column(db.Integer)  # Today's queue number
     registration_date = db.Column(db.Date, default=datetime.utcnow().date)  # Date of current visit
+    registered_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)  # When patient was registered
+    registered_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Who registered this patient
     
     # Status
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -48,8 +50,14 @@ class Patient(db.Model):
     
     # Relationships
     organization = db.relationship('Organization', backref=db.backref('patients', lazy='dynamic'))
+    registered_by = db.relationship('User', foreign_keys=[registered_by_id], backref='registered_patients')
     appointments = db.relationship('Appointment', backref='patient', lazy='dynamic')
     medical_records = db.relationship('MedicalRecord', backref='patient', lazy='dynamic')
+    
+    @property
+    def name(self):
+        """Return full name of the patient"""
+        return f"{self.first_name} {self.last_name}"
     
     # Organization-scoped unique constraint for patient_id
     __table_args__ = (
@@ -135,9 +143,11 @@ class MedicalRecord(db.Model):
     patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
     doctor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     appointment_id = db.Column(db.Integer, db.ForeignKey('appointments.id'))
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Who created this record (e.g., receptionist)
     
     # Medical data
     visit_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    visit_type = db.Column(db.Enum('routine', 'follow_up', 'emergency', 'consultation', name='visit_type'), default='routine')
     chief_complaint = db.Column(db.Text)
     diagnosis = db.Column(db.Text)
     treatment_plan = db.Column(db.Text)
@@ -158,6 +168,7 @@ class MedicalRecord(db.Model):
     # Relationships
     organization = db.relationship('Organization', backref=db.backref('medical_records', lazy='dynamic'))
     doctor = db.relationship('User', foreign_keys=[doctor_id], backref='medical_records_created')
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='medical_records_registered')
     appointment = db.relationship('Appointment', backref='medical_record', uselist=False)
     
     # Indexes for efficient querying
@@ -293,6 +304,7 @@ class LabTest(db.Model):
     
     # Timestamps
     ordered_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)  # When assigned to lab tech
     scheduled_for = db.Column(db.DateTime)  # When to perform the test
     sample_collected_at = db.Column(db.DateTime)
     completed_at = db.Column(db.DateTime)

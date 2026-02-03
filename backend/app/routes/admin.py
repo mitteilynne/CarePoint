@@ -521,3 +521,327 @@ def get_doctors_summary():
     except Exception as e:
         logger.error(f"Error getting doctors summary: {str(e)}")
         return jsonify({'error': 'Failed to get doctors summary'}), 500
+
+
+@bp.route('/lab-technicians', methods=['GET'])
+@require_admin
+def get_lab_technicians_summary():
+    """Get summary statistics for all lab technicians"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        admin_user = User.query.get(current_user_id)
+        org_id = admin_user.organization_id
+        
+        # Get days parameter for date filtering
+        days = request.args.get('days', default=30, type=int)
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Get all lab technicians in organization
+        lab_technicians = User.query.filter(
+            User.organization_id == org_id,
+            User.role == 'lab_technician',
+            User.is_active == True
+        ).all()
+        
+        lab_techs_summary = []
+        for lab_tech in lab_technicians:
+            # Count tests assigned
+            assigned_tests_count = db.session.query(func.count(LabTest.id)).filter(
+                LabTest.lab_technician_id == lab_tech.id,
+                LabTest.organization_id == org_id,
+                LabTest.assigned_at >= start_date
+            ).scalar()
+            
+            # Count completed tests
+            completed_tests_count = db.session.query(func.count(LabTest.id)).filter(
+                LabTest.lab_technician_id == lab_tech.id,
+                LabTest.organization_id == org_id,
+                LabTest.status == 'completed',
+                LabTest.assigned_at >= start_date
+            ).scalar()
+            
+            # Count pending tests
+            pending_tests_count = db.session.query(func.count(LabTest.id)).filter(
+                LabTest.lab_technician_id == lab_tech.id,
+                LabTest.organization_id == org_id,
+                LabTest.status == 'pending',
+                LabTest.assigned_at >= start_date
+            ).scalar()
+            
+            # Calculate efficiency (completed/assigned)
+            efficiency = (completed_tests_count / assigned_tests_count * 100) if assigned_tests_count > 0 else 0
+            
+            lab_techs_summary.append({
+                'id': lab_tech.id,
+                'name': f"{lab_tech.first_name} {lab_tech.last_name}",
+                'email': lab_tech.email,
+                'username': lab_tech.username,
+                'is_active': lab_tech.is_active,
+                'assigned_tests_count': assigned_tests_count or 0,
+                'completed_tests_count': completed_tests_count or 0,
+                'pending_tests_count': pending_tests_count or 0,
+                'efficiency_percentage': round(efficiency, 1)
+            })
+        
+        return jsonify({
+            'period_days': days,
+            'lab_technicians': lab_techs_summary
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting lab technicians summary: {str(e)}")
+        return jsonify({'error': 'Failed to get lab technicians summary'}), 500
+
+
+@bp.route('/lab-technicians/<int:tech_id>/stats', methods=['GET'])
+@require_admin
+def get_lab_technician_statistics(tech_id):
+    """Get detailed statistics for a specific lab technician"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        admin_user = User.query.get(current_user_id)
+        org_id = admin_user.organization_id
+        
+        # Get days parameter for date filtering
+        days = request.args.get('days', default=30, type=int)
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Get the lab technician (must be in same organization)
+        lab_tech = User.query.filter(
+            User.id == tech_id,
+            User.organization_id == org_id,
+            User.role == 'lab_technician'
+        ).first()
+        
+        if not lab_tech:
+            return jsonify({'error': 'Lab technician not found'}), 404
+        
+        # Get test statistics by type and status
+        test_stats = db.session.query(
+            LabTest.test_type,
+            func.count(case((LabTest.status == 'completed', 1), else_=None)).label('completed'),
+            func.count(case((LabTest.status == 'pending', 1), else_=None)).label('pending'),
+            func.count(LabTest.id).label('total')
+        ).filter(
+            LabTest.lab_technician_id == tech_id,
+            LabTest.organization_id == org_id,
+            LabTest.assigned_at >= start_date
+        ).group_by(LabTest.test_type).all()
+        
+        tests_by_type = []
+        for stat in test_stats:
+            tests_by_type.append({
+                'test_type': stat.test_type,
+                'completed': stat.completed,
+                'pending': stat.pending,
+                'total': stat.total
+            })
+        
+        # Get recent tests
+        recent_tests = db.session.query(LabTest).join(Patient).filter(
+            LabTest.lab_technician_id == tech_id,
+            LabTest.organization_id == org_id,
+            LabTest.assigned_at >= start_date
+        ).order_by(LabTest.assigned_at.desc()).limit(20).all()
+        
+        tests_data = []
+        for test in recent_tests:
+            tests_data.append({
+                'id': test.id,
+                'test_type': test.test_type,
+                'patient_name': test.patient.name,
+                'patient_id': test.patient.patient_id,
+                'status': test.status,
+                'assigned_at': test.assigned_at.isoformat(),
+                'completed_at': test.completed_at.isoformat() if test.completed_at else None
+            })
+        
+        # Calculate totals
+        total_assigned = db.session.query(func.count(LabTest.id)).filter(
+            LabTest.lab_technician_id == tech_id,
+            LabTest.organization_id == org_id,
+            LabTest.assigned_at >= start_date
+        ).scalar()
+        
+        total_completed = db.session.query(func.count(LabTest.id)).filter(
+            LabTest.lab_technician_id == tech_id,
+            LabTest.organization_id == org_id,
+            LabTest.status == 'completed',
+            LabTest.assigned_at >= start_date
+        ).scalar()
+        
+        total_pending = db.session.query(func.count(LabTest.id)).filter(
+            LabTest.lab_technician_id == tech_id,
+            LabTest.organization_id == org_id,
+            LabTest.status == 'pending',
+            LabTest.assigned_at >= start_date
+        ).scalar()
+        
+        return jsonify({
+            'lab_technician': {
+                'id': lab_tech.id,
+                'name': f"{lab_tech.first_name} {lab_tech.last_name}",
+                'email': lab_tech.email
+            },
+            'period_days': days,
+            'statistics': {
+                'total_assigned': total_assigned or 0,
+                'total_completed': total_completed or 0,
+                'total_pending': total_pending or 0,
+                'efficiency_percentage': round((total_completed / total_assigned * 100) if total_assigned > 0 else 0, 1)
+            },
+            'tests_by_type': tests_by_type,
+            'recent_tests': tests_data
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting lab technician statistics: {str(e)}")
+        return jsonify({'error': 'Failed to get lab technician statistics'}), 500
+
+
+@bp.route('/receptionists', methods=['GET'])
+@require_admin
+def get_receptionists_summary():
+    """Get summary statistics for all receptionists"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        admin_user = User.query.get(current_user_id)
+        org_id = admin_user.organization_id
+        
+        # Get days parameter for date filtering
+        days = request.args.get('days', default=30, type=int)
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Get all receptionists in organization
+        receptionists = User.query.filter(
+            User.organization_id == org_id,
+            User.role == 'receptionist',
+            User.is_active == True
+        ).all()
+        
+        receptionists_summary = []
+        for receptionist in receptionists:
+            # Count patients registered
+            patients_registered = db.session.query(func.count(Patient.id)).filter(
+                Patient.organization_id == org_id,
+                Patient.registered_at >= start_date,
+                Patient.registered_by_id == receptionist.id
+            ).scalar()
+            
+            # Count appointments scheduled (using medical records as proxy)
+            appointments_scheduled = db.session.query(func.count(MedicalRecord.id)).filter(
+                MedicalRecord.organization_id == org_id,
+                MedicalRecord.visit_date >= start_date,
+                MedicalRecord.created_by_id == receptionist.id
+            ).scalar()
+            
+            receptionists_summary.append({
+                'id': receptionist.id,
+                'name': f"{receptionist.first_name} {receptionist.last_name}",
+                'email': receptionist.email,
+                'username': receptionist.username,
+                'is_active': receptionist.is_active,
+                'patients_registered': patients_registered or 0,
+                'appointments_scheduled': appointments_scheduled or 0
+            })
+        
+        return jsonify({
+            'period_days': days,
+            'receptionists': receptionists_summary
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting receptionists summary: {str(e)}")
+        return jsonify({'error': 'Failed to get receptionists summary'}), 500
+
+
+@bp.route('/receptionists/<int:receptionist_id>/stats', methods=['GET'])
+@require_admin
+def get_receptionist_statistics(receptionist_id):
+    """Get detailed statistics for a specific receptionist"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        admin_user = User.query.get(current_user_id)
+        org_id = admin_user.organization_id
+        
+        # Get days parameter for date filtering
+        days = request.args.get('days', default=30, type=int)
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Get the receptionist (must be in same organization)
+        receptionist = User.query.filter(
+            User.id == receptionist_id,
+            User.organization_id == org_id,
+            User.role == 'receptionist'
+        ).first()
+        
+        if not receptionist:
+            return jsonify({'error': 'Receptionist not found'}), 404
+        
+        # Get patients registered by this receptionist
+        patients_registered = db.session.query(Patient).filter(
+            Patient.organization_id == org_id,
+            Patient.registered_at >= start_date,
+            Patient.registered_by_id == receptionist_id
+        ).order_by(Patient.registered_at.desc()).limit(20).all()
+        
+        patients_data = []
+        for patient in patients_registered:
+            patients_data.append({
+                'id': patient.id,
+                'patient_id': patient.patient_id,
+                'name': patient.name,
+                'registered_at': patient.registered_at.isoformat(),
+                'phone': patient.phone,
+                'email': patient.email
+            })
+        
+        # Get appointments scheduled by this receptionist
+        appointments = db.session.query(MedicalRecord).join(Patient).filter(
+            MedicalRecord.organization_id == org_id,
+            MedicalRecord.visit_date >= start_date,
+            MedicalRecord.created_by_id == receptionist_id
+        ).order_by(MedicalRecord.visit_date.desc()).limit(20).all()
+        
+        appointments_data = []
+        for appointment in appointments:
+            appointments_data.append({
+                'id': appointment.id,
+                'patient_name': appointment.patient.name,
+                'patient_id': appointment.patient.patient_id,
+                'visit_date': appointment.visit_date.isoformat(),
+                'chief_complaint': appointment.chief_complaint,
+                'visit_type': appointment.visit_type
+            })
+        
+        # Calculate totals
+        total_patients = db.session.query(func.count(Patient.id)).filter(
+            Patient.organization_id == org_id,
+            Patient.registered_at >= start_date,
+            Patient.registered_by_id == receptionist_id
+        ).scalar()
+        
+        total_appointments = db.session.query(func.count(MedicalRecord.id)).filter(
+            MedicalRecord.organization_id == org_id,
+            MedicalRecord.visit_date >= start_date,
+            MedicalRecord.created_by_id == receptionist_id
+        ).scalar()
+        
+        return jsonify({
+            'receptionist': {
+                'id': receptionist.id,
+                'name': f"{receptionist.first_name} {receptionist.last_name}",
+                'email': receptionist.email
+            },
+            'period_days': days,
+            'statistics': {
+                'total_patients_registered': total_patients or 0,
+                'total_appointments_scheduled': total_appointments or 0
+            },
+            'recent_patients': patients_data,
+            'recent_appointments': appointments_data
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting receptionist statistics: {str(e)}")
+        return jsonify({'error': 'Failed to get receptionist statistics'}), 500
