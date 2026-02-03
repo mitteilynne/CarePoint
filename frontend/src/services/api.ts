@@ -102,4 +102,55 @@ export const notificationsAPI = {
   },
 };
 
+// Admin API
+export const adminAPI = {
+  getDashboardOverview: async () => {
+    const response = await api.get('/admin/dashboard/overview');
+    return response.data;
+  },
+
+  getUsers: async (params?: {
+    page?: number;
+    per_page?: number;
+    role?: string;
+    search?: string;
+    status?: string;
+  }) => {
+    const response = await api.get('/admin/users', { params });
+    return response.data;
+  },
+
+  getUserDetail: async (userId: number) => {
+    const response = await api.get(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  toggleUserStatus: async (userId: number) => {
+    const response = await api.post(`/admin/users/${userId}/toggle-status`);
+    return response.data;
+  },
+
+  updateUserRole: async (userId: number, role: string) => {
+    const response = await api.put(`/admin/users/${userId}/role`, { role });
+    return response.data;
+  },
+
+  getOrganizationInfo: async () => {
+    const response = await api.get('/admin/organization/info');
+    return response.data;
+  },
+
+  getDoctorStatistics: async (doctorId: number, days?: number) => {
+    const params = days ? { days } : {};
+    const response = await api.get(`/admin/doctors/${doctorId}/statistics`, { params });
+    return response.data;
+  },
+
+  getDoctorsSummary: async (days?: number) => {
+    const params = days ? { days } : {};
+    const response = await api.get('/admin/doctors/summary', { params });
+    return response.data;
+  },
+};
+
 export default api;

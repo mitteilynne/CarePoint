@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import ReceptionistDashboard from './ReceptionistDashboard';
 import DoctorDashboard from './DoctorDashboard';
 import LabTechnicianDashboard from './LabTechnicianDashboard';
+import AdminDashboard from './AdminDashboard';
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -26,6 +27,10 @@ export default function Dashboard() {
 
   if (user?.role === 'lab_technician') {
     return <LabTechnicianDashboard />;
+  }
+
+  if (user?.role === 'admin') {
+    return <AdminDashboard />;
   }
 
   return (
