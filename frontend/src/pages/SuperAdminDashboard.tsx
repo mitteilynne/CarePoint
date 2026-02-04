@@ -98,11 +98,11 @@ export default function SuperAdminDashboard() {
   const fetchOverview = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/super-admin/dashboard/overview');
+      const response = await api.get('/super-admin/dashboard/overview');
       setOverview(response.data.overview);
       
       // Also fetch recent organizations for the overview
-      const orgsResponse = await api.get('/api/super-admin/organizations', { params: { per_page: 5 } });
+      const orgsResponse = await api.get('/super-admin/organizations', { params: { per_page: 5 } });
       setRecentOrganizations(orgsResponse.data.organizations || []);
       
       setError('');
@@ -122,7 +122,7 @@ export default function SuperAdminDashboard() {
       if (orgSearchTerm) params.search = orgSearchTerm;
       if (orgFilter !== 'all') params.status = orgFilter;
 
-      const response = await api.get('/api/super-admin/organizations', { params });
+      const response = await api.get('/super-admin/organizations', { params });
       setOrganizations(response.data.organizations || []);
       setError('');
     } catch (err: unknown) {
@@ -137,7 +137,7 @@ export default function SuperAdminDashboard() {
   const fetchOrgUsers = useCallback(async (orgId: number) => {
     try {
       setLoadingOrgUsers(true);
-      const response = await api.get(`/api/super-admin/organizations/${orgId}/users`);
+      const response = await api.get(`/super-admin/organizations/${orgId}/users`);
       setOrgUsers(response.data.users || []);
     } catch (err: unknown) {
       console.error('Failed to fetch organization users:', err);
@@ -149,7 +149,7 @@ export default function SuperAdminDashboard() {
   // Toggle organization status
   const toggleOrgStatus = async (orgId: number, currentStatus: boolean) => {
     try {
-      await api.post(`/api/super-admin/organizations/${orgId}/toggle-status`);
+      await api.post(`/super-admin/organizations/${orgId}/toggle-status`);
       setSuccessMessage(`Organization ${currentStatus ? 'disabled' : 'enabled'} successfully`);
       
       // Refresh data
@@ -173,7 +173,7 @@ export default function SuperAdminDashboard() {
   // Toggle user status
   const toggleUserStatus = async (userId: number, currentStatus: boolean) => {
     try {
-      await api.post(`/api/super-admin/users/${userId}/toggle-status`);
+      await api.post(`/super-admin/users/${userId}/toggle-status`);
       setSuccessMessage(`User ${currentStatus ? 'disabled' : 'enabled'} successfully`);
       
       // Refresh org users
@@ -193,7 +193,7 @@ export default function SuperAdminDashboard() {
     e.preventDefault();
     try {
       setSubmitting(true);
-      await api.post('/api/super-admin/organizations', {
+      await api.post('/super-admin/organizations', {
         code: orgFormData.code,
         name: orgFormData.name,
         organization_type: orgFormData.type,
