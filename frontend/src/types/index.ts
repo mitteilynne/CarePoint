@@ -4,13 +4,60 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'patient' | 'doctor' | 'admin' | 'receptionist' | 'nurse' | 'lab_technician';
+  role: 'patient' | 'doctor' | 'admin' | 'receptionist' | 'nurse' | 'lab_technician' | 'super_admin';
   phone?: string;
   address?: string;
-  organization_id: number;
-  organization_code: string;
-  organization_name: string;
+  organization_id?: number;
+  organization_code?: string;
+  organization_name?: string;
   created_at: string;
+}
+
+// Super Admin Types
+export interface OrganizationStats {
+  id: number;
+  code: string;
+  name: string;
+  type: string;
+  is_active: boolean;
+  created_at: string;
+  user_count: number;
+  patient_count: number;
+  doctor_count: number;
+  receptionist_count: number;
+  lab_technician_count: number;
+}
+
+export interface PlatformOverview {
+  total_organizations: number;
+  active_organizations: number;
+  inactive_organizations: number;
+  total_users: number;
+  total_patients: number;
+  total_doctors: number;
+  total_lab_technicians: number;
+  total_receptionists: number;
+  recent_organizations: OrganizationStats[];
+}
+
+export interface OrganizationUser {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ActivityLog {
+  id: number;
+  organization_name: string;
+  organization_code: string;
+  user_name: string;
+  action: string;
+  timestamp: string;
 }
 
 export interface AuthResponse {
@@ -26,13 +73,13 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest {
-  organization_code: string;
+  organization_code?: string;
   username: string;
   email: string;
   password: string;
   first_name: string;
   last_name: string;
-  role?: 'patient' | 'doctor' | 'admin' | 'receptionist' | 'nurse' | 'lab_technician';
+  role?: 'patient' | 'doctor' | 'admin' | 'receptionist' | 'nurse' | 'lab_technician' | 'super_admin';
   phone?: string;
   address?: string;
 }

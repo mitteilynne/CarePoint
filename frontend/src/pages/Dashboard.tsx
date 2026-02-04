@@ -4,6 +4,7 @@ import ReceptionistDashboard from './ReceptionistDashboard';
 import DoctorDashboard from './DoctorDashboard';
 import LabTechnicianDashboard from './LabTechnicianDashboard';
 import AdminDashboard from './AdminDashboard';
+import SuperAdminDashboard from './SuperAdminDashboard';
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -17,6 +18,10 @@ export default function Dashboard() {
   console.log('Full user object:', user);
 
   // Route to specific dashboard based on user role
+  if (user?.role === 'super_admin') {
+    return <SuperAdminDashboard />;
+  }
+
   if (user?.role === 'receptionist') {
     return <ReceptionistDashboard />;
   }

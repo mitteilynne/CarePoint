@@ -4,6 +4,7 @@ import api from '@/services/api';
 import DoctorDetailsModal from '@/components/DoctorDetailsModal';
 import LabTechDetailsModal from '@/components/LabTechDetailsModal';
 import ReceptionistDetailsModal from '@/components/ReceptionistDetailsModal';
+import { EmbeddedDoctorModule, EmbeddedReceptionistModule, EmbeddedLabTechModule } from '@/components/modules';
 
 interface User {
   id: number;
@@ -78,7 +79,7 @@ interface PaginationInfo {
   has_next: boolean;
 }
 
-type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization';
+type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -896,6 +897,59 @@ export default function AdminDashboard() {
           </p>
         </div>
 
+        {/* Module Access Cards - Show only on overview */}
+        {currentView === 'overview' && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">Access Full Modules</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => setCurrentView('doctor_module')}
+                className="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105"
+              >
+                <div className="flex items-center space-x-4">
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="text-left">
+                    <h3 className="text-xl font-bold">Doctor Module</h3>
+                    <p className="text-green-100 text-sm">Queue, Consultations, Lab Tests, Records</p>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => setCurrentView('receptionist_module')}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105"
+              >
+                <div className="flex items-center space-x-4">
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <div className="text-left">
+                    <h3 className="text-xl font-bold">Receptionist Module</h3>
+                    <p className="text-blue-100 text-sm">Registration, Triage, Queue Management</p>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => setCurrentView('lab_tech_module')}
+                className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow-lg hover:from-purple-600 hover:to-purple-700 transition-all transform hover:scale-105"
+              >
+                <div className="flex items-center space-x-4">
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                  <div className="text-left">
+                    <h3 className="text-xl font-bold">Lab Tech Module</h3>
+                    <p className="text-purple-100 text-sm">Lab Tests, Sample Processing, Results</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Message Display */}
         {message.text && (
           <div className={`mb-6 p-4 rounded-md ${
@@ -907,37 +961,39 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="bg-white shadow rounded-lg mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6" aria-label="Tabs">
-              {[
-                { key: 'overview', label: 'Overview' },
-                { key: 'users', label: 'All Users' },
-                { key: 'doctors', label: 'Doctors' },
-                { key: 'receptionists', label: 'Receptionists' },
-                { key: 'lab_technicians', label: 'Lab Technicians' },
-                { key: 'organization', label: 'Organization' }
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => {
-                    setCurrentView(tab.key as ViewMode);
-                    setCurrentPage(1);
-                    setMessage({ type: '', text: '' });
-                  }}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                    currentView === tab.key
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+        {/* Navigation - Hide when in module view */}
+        {!['doctor_module', 'receptionist_module', 'lab_tech_module'].includes(currentView) && (
+          <div className="bg-white shadow rounded-lg mb-6">
+            <div className="border-b border-gray-200">
+              <nav className="flex space-x-8 px-6 overflow-x-auto" aria-label="Tabs">
+                {[
+                  { key: 'overview', label: 'Overview' },
+                  { key: 'users', label: 'All Users' },
+                  { key: 'doctors', label: 'Doctors' },
+                  { key: 'receptionists', label: 'Receptionists' },
+                  { key: 'lab_technicians', label: 'Lab Technicians' },
+                  { key: 'organization', label: 'Organization' }
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setCurrentView(tab.key as ViewMode);
+                      setCurrentPage(1);
+                      setMessage({ type: '', text: '' });
+                    }}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                      currentView === tab.key
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Content */}
         {loading ? (
@@ -952,6 +1008,26 @@ export default function AdminDashboard() {
             {currentView === 'lab_technicians' && renderLabTechniciansView()}
             {currentView === 'receptionists' && renderReceptionistsView()}
             {currentView === 'organization' && renderOrganization()}
+            
+            {/* Embedded Module Views */}
+            {currentView === 'doctor_module' && (
+              <EmbeddedDoctorModule 
+                onBack={() => setCurrentView('overview')} 
+                isEmbedded={true} 
+              />
+            )}
+            {currentView === 'receptionist_module' && (
+              <EmbeddedReceptionistModule 
+                onBack={() => setCurrentView('overview')} 
+                isEmbedded={true} 
+              />
+            )}
+            {currentView === 'lab_tech_module' && (
+              <EmbeddedLabTechModule 
+                onBack={() => setCurrentView('overview')} 
+                isEmbedded={true} 
+              />
+            )}
           </div>
         )}
 

@@ -9,6 +9,7 @@ export default function Login() {
     password: '',
     rememberMe: false,
   });
+  const [isSuperAdminLogin, setIsSuperAdminLogin] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -33,6 +34,16 @@ export default function Login() {
     });
   };
 
+  const toggleSuperAdminLogin = () => {
+    setIsSuperAdminLogin(!isSuperAdminLogin);
+    setError('');
+    setFieldErrors({});
+    setFormData({
+      ...formData,
+      organizationCode: '',
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -41,7 +52,7 @@ export default function Login() {
     // Basic validation
     const errors: Record<string, string> = {};
 
-    if (!formData.organizationCode.trim()) {
+    if (!isSuperAdminLogin && !formData.organizationCode.trim()) {
       errors.organizationCode = 'Organization code is required';
     }
 
@@ -62,10 +73,19 @@ export default function Login() {
     }
 
     try {
-      await login(formData.organizationCode, formData.username, formData.password);
+      const orgCode = isSuperAdminLogin ? '' : formData.organizationCode;
+      await login(orgCode, formData.username, formData.password);
       navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed');
+    } catch (err: unknown) {
+      interface ErrorResponse {
+        response?: {
+          data?: {
+            error?: string;
+          };
+        };
+      }
+      const errorObj = err as ErrorResponse;
+      setError(errorObj.response?.data?.error || 'Login failed');
     }
   };
 
@@ -79,10 +99,13 @@ export default function Login() {
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to CarePoint
+            {isSuperAdminLogin ? 'Super Admin Login' : 'Sign in to CarePoint'}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Access your healthcare facility's patient management system
+            {isSuperAdminLogin 
+              ? 'Access the platform administration dashboard'
+              : 'Access your healthcare facility\'s patient management system'
+            }
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -99,30 +122,32 @@ export default function Login() {
           )}
           
           <div className="space-y-4">
-            <div>
-              <label htmlFor="organizationCode" className="block text-sm font-medium text-gray-700">
-                Organization Code
-              </label>
-              <div className="mt-1 relative">
-                <input
-                  id="organizationCode"
-                  name="organizationCode"
-                  type="text"
-                  required
-                  className={`appearance-none relative block w-full px-4 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 transition duration-200 ${
-                    fieldErrors.organizationCode
-                      ? 'border-red-300 focus:ring-red-500 focus:border-transparent'
-                      : 'border-gray-300 focus:ring-primary-500 focus:border-transparent'
-                  }`}
-                  placeholder="Enter organization code"
-                  value={formData.organizationCode}
-                  onChange={handleChange}
-                />
+            {!isSuperAdminLogin && (
+              <div>
+                <label htmlFor="organizationCode" className="block text-sm font-medium text-gray-700">
+                  Organization Code
+                </label>
+                <div className="mt-1 relative">
+                  <input
+                    id="organizationCode"
+                    name="organizationCode"
+                    type="text"
+                    required={!isSuperAdminLogin}
+                    className={`appearance-none relative block w-full px-4 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 transition duration-200 ${
+                      fieldErrors.organizationCode
+                        ? 'border-red-300 focus:ring-red-500 focus:border-transparent'
+                        : 'border-gray-300 focus:ring-primary-500 focus:border-transparent'
+                    }`}
+                    placeholder="Enter organization code"
+                    value={formData.organizationCode}
+                    onChange={handleChange}
+                  />
+                </div>
+                {fieldErrors.organizationCode && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.organizationCode}</p>
+                )}
               </div>
-              {fieldErrors.organizationCode && (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.organizationCode}</p>
-              )}
-            </div>
+            )}
 
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">
@@ -226,6 +251,16 @@ export default function Login() {
                 Sign up
               </Link>
             </p>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-200 text-center">
+            <button
+              type="button"
+              onClick={toggleSuperAdminLogin}
+              className="text-sm text-gray-500 hover:text-indigo-600 transition-colors"
+            >
+              {isSuperAdminLogin ? '← Back to Organization Login' : 'Super Admin Login →'}
+            </button>
           </div>
         </form>
       </div>
