@@ -6,13 +6,13 @@ class User(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
-    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=True, index=True)  # Nullable for super_admin
     username = db.Column(db.String(80), nullable=False, index=True)
     email = db.Column(db.String(120), nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
-    role = db.Column(db.Enum('patient', 'doctor', 'admin', 'receptionist', 'nurse', 'pharmacist', 'lab_technician', name='user_roles'),
+    role = db.Column(db.Enum('patient', 'doctor', 'admin', 'receptionist', 'nurse', 'pharmacist', 'lab_technician', 'super_admin', name='user_roles'),
                      nullable=False, default='patient')
     phone = db.Column(db.String(20))
     address = db.Column(db.Text)
@@ -28,9 +28,9 @@ class User(db.Model):
         db.UniqueConstraint('organization_id', 'email', name='_org_email_uc'),
     )
 
-    def __init__(self, organization_id, username, email, first_name, last_name, **kwargs):
-        # Validate inputs
-        if not all([organization_id, username, email, first_name, last_name]):
+    def __init__(self, username, email, first_name, last_name, organization_id=None, **kwargs):
+        # Validate inputs - organization_id is optional for super_admin
+        if not all([username, email, first_name, last_name]):
             raise ValueError("All required fields must be provided")
         
         # Strip whitespace and normalize

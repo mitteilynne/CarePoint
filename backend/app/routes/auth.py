@@ -98,7 +98,40 @@ def login():
     try:
         data = request.get_json()
         
-        # Validate required fields
+        # Check for super admin login (no organization code needed)
+        if data.get('username') and data.get('password') and not data.get('organization_code'):
+            # Try to find a super admin user
+            user = User.query.filter_by(
+                username=data['username'].strip(),
+                role='super_admin'
+            ).first()
+            
+            if user and user.check_password(data['password']):
+                # Super admin login successful
+                access_token = create_access_token(
+                    identity=str(user.id),
+                    expires_delta=timedelta(hours=24)
+                )
+                refresh_token = create_refresh_token(identity=str(user.id))
+                
+                logger.info(f"Super Admin logged in: {user.email}")
+                
+                return jsonify({
+                    'access_token': access_token,
+                    'refresh_token': refresh_token,
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'email': user.email,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                        'role': user.role,
+                        'organization_code': None,
+                        'organization_name': 'Platform Administration'
+                    }
+                })
+        
+        # Validate required fields for regular login
         if not data.get('organization_code') or not data.get('username') or not data.get('password'):
             return jsonify({'error': 'Organization code, username and password are required'}), 400
         
@@ -141,7 +174,8 @@ def login():
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'role': user.role,
-                'organization_code': user.organization.code
+                'organization_code': user.organization.code,
+                'organization_name': user.organization.name
             }
         })
         
