@@ -641,3 +641,160 @@ def update_referral(referral_id):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+@bp.route('/prescriptions', methods=['POST'])
+@jwt_required()
+def create_prescription():
+    """Create a new prescription for a patient"""
+    from app.models.healthcare import Prescription
+    
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or user.role != 'doctor':
+        return jsonify({'error': 'Only doctors can create prescriptions'}), 403
+    
+    organization_id = user.organization_id
+    if not organization_id:
+        return jsonify({'error': 'Organization not found'}), 404
+    
+    data = request.get_json()
+    
+    # Validate required fields
+    required_fields = ['patient_id', 'medication_name', 'dosage', 'frequency', 'duration', 'quantity']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'{field} is required'}), 400
+    
+    # Verify patient belongs to same organization
+    patient = Patient.query.filter_by(
+        id=data['patient_id'],
+        organization_id=organization_id
+    ).first()
+    
+    if not patient:
+        return jsonify({'error': 'Patient not found'}), 404
+    
+    # Create prescription
+    prescription = Prescription(
+        organization_id=organization_id,
+        patient_id=data['patient_id'],
+        doctor_id=current_user_id,
+        medical_record_id=data.get('medical_record_id'),
+        medication_name=data['medication_name'],
+        dosage=data['dosage'],
+        frequency=data['frequency'],
+        duration=data['duration'],
+        quantity=data['quantity'],
+        instructions=data.get('instructions', '')
+    )
+    
+    db.session.add(prescription)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Prescription created successfully',
+        'prescription': prescription.to_dict()
+    }), 201
+
+@bp.route('/patients/<int:patient_id>/prescriptions', methods=['GET'])
+@jwt_required()
+def get_patient_prescriptions(patient_id):
+    """Get all prescriptions for a patient"""
+    from app.models.healthcare import Prescription
+    
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    organization_id = user.organization_id
+    
+    # Verify patient belongs to same organization
+    patient = Patient.query.filter_by(
+        id=patient_id,
+        organization_id=organization_id
+    ).first()
+    
+    if not patient:
+        return jsonify({'error': 'Patient not found'}), 404
+    
+    prescriptions = Prescription.query.filter_by(
+        organization_id=organization_id,
+        patient_id=patient_id
+    ).order_by(Prescription.prescribed_at.desc()).all()
+    
+    return jsonify({
+        'prescriptions': [p.to_dict() for p in prescriptions]
+    }), 200
+
+@bp.route('/prescriptions/<int:prescription_id>', methods=['PUT'])
+@jwt_required()
+def update_prescription(prescription_id):
+    """Update a prescription (only by the prescribing doctor)"""
+    from app.models.healthcare import Prescription
+    
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or user.role != 'doctor':
+        return jsonify({'error': 'Only doctors can update prescriptions'}), 403
+    
+    organization_id = user.organization_id
+    
+    prescription = Prescription.query.filter_by(
+        id=prescription_id,
+        organization_id=organization_id,
+        doctor_id=current_user_id  # Only the prescribing doctor can update
+    ).first()
+    
+    if not prescription:
+        return jsonify({'error': 'Prescription not found or unauthorized'}), 404
+    
+    if prescription.status != 'pending':
+        return jsonify({'error': 'Cannot update prescription that has been processed'}), 400
+    
+    data = request.get_json()
+    
+    # Update allowed fields
+    updatable_fields = ['medication_name', 'dosage', 'frequency', 'duration', 'quantity', 'instructions']
+    for field in updatable_fields:
+        if field in data:
+            setattr(prescription, field, data[field])
+    
+    prescription.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Prescription updated successfully',
+        'prescription': prescription.to_dict()
+    }), 200
+
+@bp.route('/prescriptions/<int:prescription_id>', methods=['DELETE'])
+@jwt_required()
+def cancel_prescription(prescription_id):
+    """Cancel a prescription (only by the prescribing doctor)"""
+    from app.models.healthcare import Prescription
+    
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or user.role != 'doctor':
+        return jsonify({'error': 'Only doctors can cancel prescriptions'}), 403
+    
+    organization_id = user.organization_id
+    
+    prescription = Prescription.query.filter_by(
+        id=prescription_id,
+        organization_id=organization_id,
+        doctor_id=current_user_id
+    ).first()
+    
+    if not prescription:
+        return jsonify({'error': 'Prescription not found or unauthorized'}), 404
+    
+    if prescription.status in ['dispensed', 'partially_dispensed']:
+        return jsonify({'error': 'Cannot cancel prescription that has been dispensed'}), 400
+    
+    prescription.status = 'cancelled'
+    prescription.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({'message': 'Prescription cancelled successfully'}), 200

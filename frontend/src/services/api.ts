@@ -163,4 +163,95 @@ export const adminAPI = {
   },
 };
 
+// Doctor API (Healthcare API)
+export const doctorAPI = {
+  createPrescription: async (data: {
+    patient_id: number;
+    medication_name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    quantity: number;
+    instructions?: string;
+    medical_record_id?: number;
+  }) => {
+    const response = await api.post('/healthcare/prescriptions', data);
+    return response.data;
+  },
+
+  getPatientPrescriptions: async (patientId: number) => {
+    const response = await api.get(`/healthcare/patients/${patientId}/prescriptions`);
+    return response.data;
+  },
+
+  updatePrescription: async (prescriptionId: number, data: any) => {
+    const response = await api.put(`/healthcare/prescriptions/${prescriptionId}`, data);
+    return response.data;
+  },
+
+  cancelPrescription: async (prescriptionId: number) => {
+    const response = await api.delete(`/healthcare/prescriptions/${prescriptionId}`);
+    return response.data;
+  },
+};
+
+// Pharmacist API
+export const pharmacistAPI = {
+  getPrescriptions: async (status?: string, search?: string) => {
+    const params: any = {};
+    if (status) params.status = status;
+    if (search) params.search = search;
+    const response = await api.get('/pharmacist/prescriptions', { params });
+    return response.data;
+  },
+
+  getPrescriptionDetails: async (prescriptionId: number) => {
+    const response = await api.get(`/pharmacist/prescriptions/${prescriptionId}`);
+    return response.data;
+  },
+
+  dispensePrescription: async (prescriptionId: number, data: { quantity_dispensed: number; notes?: string }) => {
+    const response = await api.post(`/pharmacist/prescriptions/${prescriptionId}/dispense`, data);
+    return response.data;
+  },
+
+  referPrescription: async (prescriptionId: number, data: { referral_notes: string }) => {
+    const response = await api.post(`/pharmacist/prescriptions/${prescriptionId}/refer`, data);
+    return response.data;
+  },
+
+  getInventory: async (search?: string, lowStockOnly?: boolean) => {
+    const params: any = {};
+    if (search) params.search = search;
+    if (lowStockOnly) params.low_stock_only = 'true';
+    const response = await api.get('/pharmacist/inventory', { params });
+    return response.data;
+  },
+
+  addInventoryItem: async (data: any) => {
+    const response = await api.post('/pharmacist/inventory', data);
+    return response.data;
+  },
+
+  updateInventoryItem: async (itemId: number, data: any) => {
+    const response = await api.put(`/pharmacist/inventory/${itemId}`, data);
+    return response.data;
+  },
+
+  deleteInventoryItem: async (itemId: number) => {
+    const response = await api.delete(`/pharmacist/inventory/${itemId}`);
+    return response.data;
+  },
+
+  getPatientPrescriptions: async (patientId: number) => {
+    const response = await api.get(`/pharmacist/patients/${patientId}/prescriptions`);
+    return response.data;
+  },
+
+  getStats: async () => {
+    const response = await api.get('/pharmacist/stats');
+    return response.data;
+  },
+};
+
 export default api;

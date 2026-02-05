@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import ReceptionistDashboard from './ReceptionistDashboard';
 import DoctorDashboard from './DoctorDashboard';
 import LabTechnicianDashboard from './LabTechnicianDashboard';
+import PharmacistDashboard from './PharmacistDashboard';
 import AdminDashboard from './AdminDashboard';
 import SuperAdminDashboard from './SuperAdminDashboard';
 
@@ -32,6 +33,10 @@ export default function Dashboard() {
 
   if (user?.role === 'lab_technician') {
     return <LabTechnicianDashboard />;
+  }
+
+  if (user?.role === 'pharmacist') {
+    return <PharmacistDashboard />;
   }
 
   if (user?.role === 'admin') {

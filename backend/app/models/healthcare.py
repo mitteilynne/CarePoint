@@ -513,6 +513,165 @@ class Notification(db.Model):
     def __repr__(self):
         return f'<Notification {self.id}: {self.notification_type} for User {self.recipient_id}>'
 
+class Prescription(db.Model):
+    """Prescriptions issued by doctors for patients"""
+    __tablename__ = 'prescriptions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    
+    # Prescription details
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    medical_record_id = db.Column(db.Integer, db.ForeignKey('medical_records.id'))
+    
+    # Medication information
+    medication_name = db.Column(db.String(200), nullable=False)
+    dosage = db.Column(db.String(100), nullable=False)  # e.g., "500mg"
+    frequency = db.Column(db.String(100), nullable=False)  # e.g., "Twice daily"
+    duration = db.Column(db.String(100), nullable=False)  # e.g., "7 days"
+    quantity = db.Column(db.Integer, nullable=False)  # Total quantity to dispense
+    instructions = db.Column(db.Text)  # Special instructions
+    
+    # Status tracking
+    status = db.Column(db.Enum('pending', 'dispensed', 'partially_dispensed', 'cancelled', 'referred', 
+                               name='prescription_status'), nullable=False, default='pending')
+    dispensed_quantity = db.Column(db.Integer, default=0)
+    dispensed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Pharmacist who dispensed
+    dispensed_at = db.Column(db.DateTime)
+    
+    # Referral information (if medication not available)
+    referral_notes = db.Column(db.Text)  # Where patient was referred to
+    referred_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Pharmacist who made referral
+    referred_at = db.Column(db.DateTime)
+    
+    # Timestamps
+    prescribed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    organization = db.relationship('Organization', backref=db.backref('prescriptions', lazy='dynamic'))
+    patient = db.relationship('Patient', backref='prescriptions', foreign_keys=[patient_id])
+    doctor = db.relationship('User', foreign_keys=[doctor_id], backref='prescriptions_written')
+    dispensed_by = db.relationship('User', foreign_keys=[dispensed_by_id], backref='prescriptions_dispensed')
+    referred_by = db.relationship('User', foreign_keys=[referred_by_id], backref='prescriptions_referred')
+    medical_record = db.relationship('MedicalRecord', backref='prescriptions')
+    
+    # Indexes for efficient querying
+    __table_args__ = (
+        db.Index('idx_prescription_org_patient', 'organization_id', 'patient_id'),
+        db.Index('idx_prescription_org_status', 'organization_id', 'status'),
+        db.Index('idx_prescription_org_date', 'organization_id', 'prescribed_at'),
+    )
+    
+    def to_dict(self):
+        """Convert prescription to dictionary"""
+        return {
+            'id': self.id,
+            'patient_id': self.patient_id,
+            'patient_name': self.patient.name if self.patient else None,
+            'doctor_id': self.doctor_id,
+            'doctor_name': f"{self.doctor.first_name} {self.doctor.last_name}" if self.doctor else None,
+            'medication_name': self.medication_name,
+            'dosage': self.dosage,
+            'frequency': self.frequency,
+            'duration': self.duration,
+            'quantity': self.quantity,
+            'dispensed_quantity': self.dispensed_quantity,
+            'instructions': self.instructions,
+            'status': self.status,
+            'dispensed_at': self.dispensed_at.isoformat() if self.dispensed_at else None,
+            'dispensed_by': f"{self.dispensed_by.first_name} {self.dispensed_by.last_name}" if self.dispensed_by else None,
+            'referral_notes': self.referral_notes,
+            'referred_at': self.referred_at.isoformat() if self.referred_at else None,
+            'prescribed_at': self.prescribed_at.isoformat() if self.prescribed_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class PharmacyInventory(db.Model):
+    """Pharmacy inventory management with organization isolation"""
+    __tablename__ = 'pharmacy_inventory'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    
+    # Medication details
+    medication_name = db.Column(db.String(200), nullable=False)
+    generic_name = db.Column(db.String(200))
+    brand_name = db.Column(db.String(200))
+    dosage_form = db.Column(db.String(100))  # e.g., "Tablet", "Capsule", "Syrup"
+    strength = db.Column(db.String(100))  # e.g., "500mg", "10ml"
+    
+    # Inventory tracking
+    quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
+    minimum_stock_level = db.Column(db.Integer, nullable=False, default=10)  # Alert threshold
+    unit_of_measure = db.Column(db.String(50), default='units')  # units, boxes, bottles, etc.
+    
+    # Storage and identification
+    batch_number = db.Column(db.String(100))
+    expiry_date = db.Column(db.Date)
+    storage_location = db.Column(db.String(100))  # Shelf/Cabinet location
+    
+    # Pricing
+    unit_price = db.Column(Numeric(10, 2))
+    supplier = db.Column(db.String(200))
+    
+    # Status
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    notes = db.Column(db.Text)  # Additional notes
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_restocked_at = db.Column(db.DateTime)
+    
+    # Relationships
+    organization = db.relationship('Organization', backref=db.backref('pharmacy_inventory', lazy='dynamic'))
+    
+    # Organization-scoped unique constraint
+    __table_args__ = (
+        db.UniqueConstraint('organization_id', 'medication_name', 'strength', 'batch_number', 
+                          name='_org_medication_batch_uc'),
+        db.Index('idx_inventory_org_med', 'organization_id', 'medication_name'),
+        db.Index('idx_inventory_org_stock', 'organization_id', 'quantity_in_stock'),
+    )
+    
+    @property
+    def is_low_stock(self):
+        """Check if inventory is below minimum stock level"""
+        return self.quantity_in_stock <= self.minimum_stock_level
+    
+    @property
+    def is_out_of_stock(self):
+        """Check if inventory is out of stock"""
+        return self.quantity_in_stock == 0
+    
+    def to_dict(self):
+        """Convert inventory item to dictionary"""
+        return {
+            'id': self.id,
+            'medication_name': self.medication_name,
+            'generic_name': self.generic_name,
+            'brand_name': self.brand_name,
+            'dosage_form': self.dosage_form,
+            'strength': self.strength,
+            'quantity_in_stock': self.quantity_in_stock,
+            'minimum_stock_level': self.minimum_stock_level,
+            'unit_of_measure': self.unit_of_measure,
+            'batch_number': self.batch_number,
+            'expiry_date': self.expiry_date.isoformat() if self.expiry_date else None,
+            'storage_location': self.storage_location,
+            'unit_price': float(self.unit_price) if self.unit_price else None,
+            'supplier': self.supplier,
+            'is_active': self.is_active,
+            'is_low_stock': self.is_low_stock,
+            'is_out_of_stock': self.is_out_of_stock,
+            'notes': self.notes,
+            'last_restocked_at': self.last_restocked_at.isoformat() if self.last_restocked_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 # Data isolation enforcement through SQLAlchemy events
 @event.listens_for(Patient, 'before_insert')
 @event.listens_for(Department, 'before_insert')
@@ -523,6 +682,8 @@ class Notification(db.Model):
 @event.listens_for(Referral, 'before_insert')
 @event.listens_for(QueueManagement, 'before_insert')
 @event.listens_for(Notification, 'before_insert')
+@event.listens_for(Prescription, 'before_insert')
+@event.listens_for(PharmacyInventory, 'before_insert')
 def validate_organization_before_insert(mapper, connection, target):
     """Ensure organization_id is always set before inserting records"""
     if not hasattr(target, 'organization_id') or target.organization_id is None:

@@ -29,6 +29,7 @@ def create_app(config_name='default'):
     from app.routes.notifications import notifications_bp
     from app.routes.admin import bp as admin_bp
     from app.routes.super_admin import bp as super_admin_bp
+    from app.routes.pharmacist import pharmacist_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -39,5 +40,6 @@ def create_app(config_name='default'):
     app.register_blueprint(notifications_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(super_admin_bp)
+    app.register_blueprint(pharmacist_bp)
     
     return app
