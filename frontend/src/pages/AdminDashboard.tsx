@@ -1044,7 +1044,10 @@ export default function AdminDashboard() {
               />
             )}
             {currentView === 'pharmacist_module' && (
-              <EmbeddedPharmacistModule />
+              <EmbeddedPharmacistModule 
+                onBack={() => setCurrentView('overview')} 
+                isEmbedded={true} 
+              />
             )}
           </div>
         )}
