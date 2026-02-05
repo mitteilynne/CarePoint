@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Register() {
   const [formData, setFormData] = useState({
-    organizationCode: '',
     username: '',
     email: '',
     password: '',
@@ -29,24 +28,14 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
-    if (!formData.organizationCode.trim()) {
-      setError('Organization code is required');
-      return;
-    }
-
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
     try {
-      const { confirmPassword, organizationCode, ...userData } = formData;
-      // Rename organizationCode to organization_code for API
-      const apiData = {
-        ...userData,
-        organization_code: organizationCode,
-      };
-      await register(apiData);
+      const { confirmPassword, ...userData } = formData;
+      await register(userData);
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed');
@@ -69,18 +58,6 @@ export default function Register() {
           )}
           
           <div className="space-y-4">
-            <div>
-              <input
-                name="organizationCode"
-                type="text"
-                required
-                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Organization Code"
-                value={formData.organizationCode}
-                onChange={handleChange}
-              />
-            </div>
-            
             <div className="grid grid-cols-2 gap-4">
               <input
                 name="first_name"

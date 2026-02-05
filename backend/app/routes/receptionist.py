@@ -1,87 +1,281 @@
-"""
-Receptionist API routes for patient registration, queue management, and triage.
-All routes are organization-scoped and require receptionist or higher privileges.
-"""
-
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from app.utils.data_isolation import (
-    patient_service, 
-    OrganizationScopedQuery,
-    organization_required
-)
-from app.models import Patient, Triage, QueueManagement, User
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from datetime import datetime, date, timedelta
-from functools import wraps
-import traceback
+from app.models import User, Patient, Appointment, Department, QueueManagement, Triage
+from app.utils.decorators import role_required
+from datetime import datetime, date
 
 bp = Blueprint('receptionist', __name__, url_prefix='/api/receptionist')
 
-def receptionist_required(f):
-    """Decorator to ensure user has receptionist privileges or higher"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        claims = get_jwt()
-        user_role = claims.get('role')
-        
-        allowed_roles = ['receptionist', 'nurse', 'doctor', 'admin']
-        if user_role not in allowed_roles:
-            return jsonify({'error': 'Receptionist privileges required'}), 403
-        
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Queue Management Routes
-@bp.route('/queue/status', methods=['GET'])
+@bp.route('/patients', methods=['GET'])
 @jwt_required()
-@organization_required
-@receptionist_required
-def get_queue_status():
-    """Get current queue status for today"""
+@role_required(['receptionist', 'admin', 'doctor', 'nurse'])
+def get_patients():
+    """Get all patients for the organization"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    # Get patients for the organization
+    patients = Patient.query.filter_by(organization_id=user.organization_id).all()
+    
+    return jsonify({
+        'patients': [patient.to_dict() for patient in patients]
+    }), 200
+
+
+@bp.route('/patients/<int:patient_id>', methods=['GET'])
+@jwt_required()
+@role_required(['receptionist', 'admin', 'doctor', 'nurse'])
+def get_patient(patient_id):
+    """Get specific patient details"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    patient = Patient.query.filter_by(
+        id=patient_id,
+        organization_id=user.organization_id
+    ).first()
+    
+    if not patient:
+        return jsonify({'error': 'Patient not found'}), 404
+    
+    return jsonify(patient.to_dict()), 200
+
+
+@bp.route('/patients', methods=['POST'])
+@jwt_required()
+@role_required(['receptionist', 'admin'])
+def create_patient():
+    """Register a new patient"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    data = request.get_json()
+    
+    # Validate required fields
+    required_fields = ['first_name', 'last_name', 'date_of_birth', 'gender', 'phone']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Missing required field: {field}'}), 400
+    
     try:
-        org_id = OrganizationScopedQuery.get_current_org_id()
-        today = date.today()
+        # Create new patient
+        patient = Patient(
+            organization_id=user.organization_id,
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            date_of_birth=datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date(),
+            gender=data['gender'],
+            phone=data['phone'],
+            email=data.get('email'),
+            address=data.get('address'),
+            emergency_contact_name=data.get('emergency_contact_name'),
+            emergency_contact_phone=data.get('emergency_contact_phone'),
+            blood_type=data.get('blood_type'),
+            allergies=data.get('allergies'),
+            medical_history=data.get('medical_history')
+        )
         
-        # Get today's queue management record
-        queue_mgmt = QueueManagement.get_or_create_today(org_id)
-        
-        # Get today's triage assessments
-        todays_triage = db.session.query(Triage).filter(
-            Triage.organization_id == org_id,
-            db.func.date(Triage.arrival_time) == today
-        ).order_by(Triage.priority_score, Triage.arrival_time).all()
-        
-        # Count by status
-        waiting = [t for t in todays_triage if t.queue_status == 'waiting']
-        in_progress = [t for t in todays_triage if t.queue_status == 'in_progress']
-        completed = [t for t in todays_triage if t.queue_status == 'completed']
+        db.session.add(patient)
+        db.session.commit()
         
         return jsonify({
-            'queue_management': {
-                'current_number': queue_mgmt.current_queue_number,
-                'total_today': queue_mgmt.total_patients_today,
-                'average_wait_time': queue_mgmt.average_wait_time,
-                'emergency_count': queue_mgmt.emergency_count,
-                'urgent_count': queue_mgmt.urgent_count,
-                'routine_count': queue_mgmt.routine_count
-            },
-            'queue_counts': {
-                'waiting': len(waiting),
-                'in_progress': len(in_progress),
-                'completed': len(completed)
-            },
-            'waiting_patients': [{
-                'id': t.id,
-                'patient_name': f"{t.patient.first_name} {t.patient.last_name}",
-                'queue_number': t.queue_number,
-                'triage_level': t.triage_level,
-                'chief_complaint': t.chief_complaint,
-                'arrival_time': t.arrival_time.isoformat(),
-                'wait_time_minutes': int((datetime.utcnow() - t.arrival_time).total_seconds() / 60)
-            } for t in waiting]
-        })
+            'message': 'Patient registered successfully',
+            'patient': patient.to_dict()
+        }), 201
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-# Patient Registration Routes\n@bp.route('/register-patient', methods=['POST'])\n@jwt_required()\n@organization_required\n@receptionist_required\ndef register_patient():\n    \"\"\"Register a new patient (walk-in or appointment)\"\"\"\n    try:\n        data = request.get_json()\n        org_id = OrganizationScopedQuery.get_current_org_id()\n        \n        # Auto-generate patient ID if not provided\n        if not data.get('patient_id'):\n            # Generate next patient ID for this organization\n            last_patient = Patient.query.filter_by(organization_id=org_id).order_by(Patient.id.desc()).first()\n            if last_patient and last_patient.patient_id:\n                try:\n                    last_num = int(last_patient.patient_id[1:])  # Remove prefix letter\n                    next_num = last_num + 1\n                except:\n                    next_num = 1\n            else:\n                next_num = 1\n            \n            # Get organization code for prefix\n            from app.models import Organization\n            org = Organization.query.get(org_id)\n            prefix = org.code[0] if org else 'P'  # Use first letter of org code\n            data['patient_id'] = f\"{prefix}{next_num:04d}\"\n        \n        # Convert date_of_birth if provided\n        if 'date_of_birth' in data and data['date_of_birth']:\n            data['date_of_birth'] = datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date()\n        \n        # Set registration info\n        data['registration_date'] = date.today()\n        data['visit_type'] = data.get('visit_type', 'walk_in')\n        data['registration_status'] = 'registered'\n        \n        # Create patient\n        patient = patient_service.create(data)\n        \n        return jsonify({\n            'message': 'Patient registered successfully',\n            'patient': {\n                'id': patient.id,\n                'patient_id': patient.patient_id,\n                'first_name': patient.first_name,\n                'last_name': patient.last_name,\n                'registration_date': patient.registration_date.isoformat(),\n                'visit_type': patient.visit_type\n            }\n        }), 201\n    except Exception as e:\n        db.session.rollback()\n        return jsonify({'error': str(e)}), 400\n\n@bp.route('/patient/<int:patient_id>/triage', methods=['POST'])\n@jwt_required()\n@organization_required\n@receptionist_required\ndef conduct_triage(patient_id):\n    \"\"\"Conduct triage assessment for a patient\"\"\"\n    try:\n        data = request.get_json()\n        org_id = OrganizationScopedQuery.get_current_org_id()\n        current_user_id = get_jwt_identity()\n        \n        # Verify patient belongs to organization\n        patient = Patient.query.filter_by(id=patient_id, organization_id=org_id).first()\n        if not patient:\n            return jsonify({'error': 'Patient not found'}), 404\n        \n        # Get today's queue management\n        queue_mgmt = QueueManagement.get_or_create_today(org_id)\n        queue_number = queue_mgmt.get_next_queue_number()\n        \n        # Create triage assessment\n        triage_data = {\n            'organization_id': org_id,\n            'patient_id': patient_id,\n            'receptionist_id': current_user_id,\n            'queue_number': queue_number,\n            'chief_complaint': data.get('chief_complaint', ''),\n            'pain_scale': data.get('pain_scale'),\n            'temperature': data.get('temperature'),\n            'blood_pressure_systolic': data.get('blood_pressure_systolic'),\n            'blood_pressure_diastolic': data.get('blood_pressure_diastolic'),\n            'heart_rate': data.get('heart_rate'),\n            'respiratory_rate': data.get('respiratory_rate'),\n            'oxygen_saturation': data.get('oxygen_saturation'),\n            'weight': data.get('weight'),\n            'height': data.get('height'),\n            'symptoms': data.get('symptoms', ''),\n            'allergies_noted': data.get('allergies_noted', ''),\n            'current_medications_noted': data.get('current_medications_noted', ''),\n            'mobility_status': data.get('mobility_status'),\n            'receptionist_notes': data.get('receptionist_notes', ''),\n            'special_requirements': data.get('special_requirements', ''),\n            'triage_level': data.get('triage_level', 'non_urgent'),\n            'estimated_wait_time': data.get('estimated_wait_time', queue_mgmt.average_wait_time)\n        }\n        \n        triage = Triage(**triage_data)\n        \n        # Calculate priority score based on assessment\n        triage.calculate_priority_score()\n        \n        db.session.add(triage)\n        \n        # Update patient status and queue number\n        patient.registration_status = 'triaged'\n        patient.current_queue_number = queue_number\n        \n        # Update queue management statistics\n        if triage.triage_level == 'emergency':\n            queue_mgmt.emergency_count += 1\n        elif triage.triage_level == 'urgent':\n            queue_mgmt.urgent_count += 1\n        else:\n            queue_mgmt.routine_count += 1\n        \n        db.session.commit()\n        \n        return jsonify({\n            'message': 'Triage assessment completed successfully',\n            'triage': {\n                'id': triage.id,\n                'queue_number': triage.queue_number,\n                'triage_level': triage.triage_level,\n                'priority_score': triage.priority_score,\n                'estimated_wait_time': triage.estimated_wait_time\n            },\n            'patient': {\n                'id': patient.id,\n                'status': patient.registration_status,\n                'queue_number': patient.current_queue_number\n            }\n        }), 201\n    except Exception as e:\n        db.session.rollback()\n        return jsonify({'error': str(e)}), 400\n\n# Patient Search and Management\n@bp.route('/patients/search', methods=['GET'])\n@jwt_required()\n@organization_required\n@receptionist_required\ndef search_patients():\n    \"\"\"Search patients by name, patient ID, or phone\"\"\"\n    try:\n        search_term = request.args.get('q', '').strip()\n        visit_date = request.args.get('date')  # Optional date filter\n        \n        org_id = OrganizationScopedQuery.get_current_org_id()\n        \n        query = Patient.query.filter_by(organization_id=org_id)\n        \n        if search_term:\n            search_pattern = f\"%{search_term}%\"\n            query = query.filter(\n                db.or_(\n                    Patient.first_name.ilike(search_pattern),\n                    Patient.last_name.ilike(search_pattern),\n                    Patient.patient_id.ilike(search_pattern),\n                    Patient.phone.ilike(search_pattern),\n                    Patient.email.ilike(search_pattern)\n                )\n            )\n        \n        if visit_date:\n            target_date = datetime.strptime(visit_date, '%Y-%m-%d').date()\n            query = query.filter(Patient.registration_date == target_date)\n        \n        patients = query.order_by(Patient.created_at.desc()).limit(50).all()\n        \n        return jsonify({\n            'patients': [{\n                'id': p.id,\n                'patient_id': p.patient_id,\n                'first_name': p.first_name,\n                'last_name': p.last_name,\n                'date_of_birth': p.date_of_birth.isoformat() if p.date_of_birth else None,\n                'phone': p.phone,\n                'email': p.email,\n                'registration_status': p.registration_status,\n                'visit_type': p.visit_type,\n                'current_queue_number': p.current_queue_number,\n                'registration_date': p.registration_date.isoformat() if p.registration_date else None\n            } for p in patients],\n            'total': len(patients)\n        })\n    except Exception as e:\n        return jsonify({'error': str(e)}), 500\n\n@bp.route('/patients/todays-registrations', methods=['GET'])\n@jwt_required()\n@organization_required\n@receptionist_required\ndef get_todays_registrations():\n    \"\"\"Get all patients registered today\"\"\"\n    try:\n        org_id = OrganizationScopedQuery.get_current_org_id()\n        today = date.today()\n        \n        patients = Patient.query.filter(\n            Patient.organization_id == org_id,\n            Patient.registration_date == today\n        ).order_by(Patient.created_at.desc()).all()\n        \n        return jsonify({\n            'patients': [{\n                'id': p.id,\n                'patient_id': p.patient_id,\n                'first_name': p.first_name,\n                'last_name': p.last_name,\n                'phone': p.phone,\n                'registration_status': p.registration_status,\n                'visit_type': p.visit_type,\n                'current_queue_number': p.current_queue_number,\n                'created_at': p.created_at.isoformat()\n            } for p in patients],\n            'total': len(patients),\n            'date': today.isoformat()\n        })\n    except Exception as e:\n        return jsonify({'error': str(e)}), 500\n\n# Queue Management\n@bp.route('/queue/call-next', methods=['POST'])\n@jwt_required()\n@organization_required\n@receptionist_required\ndef call_next_patient():\n    \"\"\"Call the next patient in the queue\"\"\"\n    try:\n        org_id = OrganizationScopedQuery.get_current_org_id()\n        today = date.today()\n        \n        # Find the next waiting patient with highest priority\n        next_triage = db.session.query(Triage).filter(\n            Triage.organization_id == org_id,\n            db.func.date(Triage.arrival_time) == today,\n            Triage.queue_status == 'waiting'\n        ).order_by(Triage.priority_score, Triage.arrival_time).first()\n        \n        if not next_triage:\n            return jsonify({'message': 'No patients waiting in queue'}), 200\n        \n        # Update triage status\n        next_triage.queue_status = 'called'\n        next_triage.called_at = datetime.utcnow()\n        \n        # Update patient status\n        patient = next_triage.patient\n        patient.registration_status = 'waiting'\n        \n        db.session.commit()\n        \n        return jsonify({\n            'message': 'Patient called successfully',\n            'patient': {\n                'id': patient.id,\n                'patient_id': patient.patient_id,\n                'name': f\"{patient.first_name} {patient.last_name}\",\n                'queue_number': next_triage.queue_number,\n                'triage_level': next_triage.triage_level\n            }\n        })\n    except Exception as e:\n        db.session.rollback()\n        return jsonify({'error': str(e)}), 500\n\n@bp.route('/queue/update-status/<int:triage_id>', methods=['PUT'])\n@jwt_required()\n@organization_required\n@receptionist_required\ndef update_queue_status(triage_id):\n    \"\"\"Update patient queue status\"\"\"\n    try:\n        data = request.get_json()\n        org_id = OrganizationScopedQuery.get_current_org_id()\n        \n        triage = Triage.query.filter_by(\n            id=triage_id,\n            organization_id=org_id\n        ).first()\n        \n        if not triage:\n            return jsonify({'error': 'Triage record not found'}), 404\n        \n        new_status = data.get('queue_status')\n        if new_status in ['waiting', 'called', 'in_progress', 'completed', 'left']:\n            triage.queue_status = new_status\n            \n            if new_status == 'in_progress':\n                triage.patient.registration_status = 'in_consultation'\n            elif new_status == 'completed':\n                triage.patient.registration_status = 'completed'\n                triage.completed_at = datetime.utcnow()\n            elif new_status == 'left':\n                triage.patient.registration_status = 'discharged'\n                triage.completed_at = datetime.utcnow()\n        \n        db.session.commit()\n        \n        return jsonify({\n            'message': 'Queue status updated successfully',\n            'triage': {\n                'id': triage.id,\n                'queue_status': triage.queue_status,\n                'patient_status': triage.patient.registration_status\n            }\n        })\n    except Exception as e:\n        db.session.rollback()\n        return jsonify({'error': str(e)}), 500\n\n# Statistics and Reports\n@bp.route('/statistics/daily', methods=['GET'])\n@jwt_required()\n@organization_required\n@receptionist_required\ndef get_daily_statistics():\n    \"\"\"Get daily statistics for receptionist dashboard\"\"\"\n    try:\n        org_id = OrganizationScopedQuery.get_current_org_id()\n        report_date = request.args.get('date')\n        \n        if report_date:\n            target_date = datetime.strptime(report_date, '%Y-%m-%d').date()\n        else:\n            target_date = date.today()\n        \n        # Get registrations for the date\n        registrations = Patient.query.filter(\n            Patient.organization_id == org_id,\n            Patient.registration_date == target_date\n        ).all()\n        \n        # Get triage assessments for the date\n        triages = Triage.query.filter(\n            Triage.organization_id == org_id,\n            db.func.date(Triage.arrival_time) == target_date\n        ).all()\n        \n        # Calculate statistics\n        stats = {\n            'date': target_date.isoformat(),\n            'total_registrations': len(registrations),\n            'total_triages': len(triages),\n            'by_visit_type': {},\n            'by_triage_level': {},\n            'by_status': {},\n            'average_wait_time': 0\n        }\n        \n        # Group by visit type\n        for patient in registrations:\n            visit_type = patient.visit_type or 'unknown'\n            stats['by_visit_type'][visit_type] = stats['by_visit_type'].get(visit_type, 0) + 1\n        \n        # Group by triage level\n        completed_triages = []\n        for triage in triages:\n            level = triage.triage_level\n            stats['by_triage_level'][level] = stats['by_triage_level'].get(level, 0) + 1\n            \n            status = triage.queue_status\n            stats['by_status'][status] = stats['by_status'].get(status, 0) + 1\n            \n            # Calculate wait time for completed\n            if triage.completed_at:\n                wait_time = (triage.completed_at - triage.arrival_time).total_seconds() / 60\n                completed_triages.append(wait_time)\n        \n        # Average wait time\n        if completed_triages:\n            stats['average_wait_time'] = round(sum(completed_triages) / len(completed_triages), 1)\n        \n        return jsonify({'statistics': stats})\n    except Exception as e:\n        return jsonify({'error': str(e)}), 500
+
+@bp.route('/patients/<int:patient_id>', methods=['PUT'])
+@jwt_required()
+@role_required(['receptionist', 'admin'])
+def update_patient(patient_id):
+    """Update patient information"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    patient = Patient.query.filter_by(
+        id=patient_id,
+        organization_id=user.organization_id
+    ).first()
+    
+    if not patient:
+        return jsonify({'error': 'Patient not found'}), 404
+    
+    data = request.get_json()
+    
+    # Update allowed fields
+    allowed_fields = [
+        'first_name', 'last_name', 'phone', 'email', 'address',
+        'emergency_contact_name', 'emergency_contact_phone',
+        'blood_type', 'allergies', 'medical_history'
+    ]
+    
+    for field in allowed_fields:
+        if field in data:
+            setattr(patient, field, data[field])
+    
+    if 'date_of_birth' in data:
+        patient.date_of_birth = datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date()
+    
+    patient.updated_at = datetime.utcnow()
+    
+    try:
+        db.session.commit()
+        return jsonify({
+            'message': 'Patient updated successfully',
+            'patient': patient.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/appointments', methods=['GET'])
+@jwt_required()
+@role_required(['receptionist', 'admin', 'doctor'])
+def get_appointments():
+    """Get appointments for the organization"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    # Filter by date if provided
+    date_str = request.args.get('date')
+    if date_str:
+        filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        appointments = Appointment.query.filter_by(
+            organization_id=user.organization_id
+        ).filter(
+            db.func.date(Appointment.appointment_datetime) == filter_date
+        ).all()
+    else:
+        appointments = Appointment.query.filter_by(
+            organization_id=user.organization_id
+        ).all()
+    
+    return jsonify({
+        'appointments': [apt.to_dict() for apt in appointments]
+    }), 200
+
+
+@bp.route('/appointments', methods=['POST'])
+@jwt_required()
+@role_required(['receptionist', 'admin'])
+def create_appointment():
+    """Create a new appointment"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    data = request.get_json()
+    
+    # Validate required fields
+    required_fields = ['patient_id', 'doctor_id', 'appointment_datetime', 'reason']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Missing required field: {field}'}), 400
+    
+    try:
+        appointment = Appointment(
+            organization_id=user.organization_id,
+            patient_id=data['patient_id'],
+            doctor_id=data['doctor_id'],
+            appointment_datetime=datetime.fromisoformat(data['appointment_datetime']),
+            reason=data['reason'],
+            notes=data.get('notes'),
+            status='scheduled'
+        )
+        
+        db.session.add(appointment)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Appointment created successfully',
+            'appointment': appointment.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/queue', methods=['GET'])
+@jwt_required()
+@role_required(['receptionist', 'admin', 'doctor', 'nurse'])
+def get_queue():
+    """Get current queue"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    # Get active queue items
+    queue_items = QueueManagement.query.filter_by(
+        organization_id=user.organization_id,
+        status='waiting'
+    ).order_by(QueueManagement.queue_number).all()
+    
+    return jsonify({
+        'queue': [item.to_dict() for item in queue_items]
+    }), 200
+
+
+@bp.route('/departments', methods=['GET'])
+@jwt_required()
+@role_required(['receptionist', 'admin', 'doctor', 'nurse'])
+def get_departments():
+    """Get all departments"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    departments = Department.query.filter_by(
+        organization_id=user.organization_id
+    ).all()
+    
+    return jsonify({
+        'departments': [dept.to_dict() for dept in departments]
+    }), 200
+
+
+@bp.route('/doctors', methods=['GET'])
+@jwt_required()
+@role_required(['receptionist', 'admin'])
+def get_doctors():
+    """Get all doctors in the organization"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    doctors = User.query.filter_by(
+        organization_id=user.organization_id,
+        role='doctor',
+        is_active=True
+    ).all()
+    
+    return jsonify({
+        'doctors': [doctor.to_dict() for doctor in doctors]
+    }), 200

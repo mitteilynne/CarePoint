@@ -4,7 +4,7 @@ import uuid
 
 class Organization(db.Model):
     __tablename__ = 'organizations'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(20), unique=True, nullable=False, index=True)
     name = db.Column(db.String(255), nullable=False)
@@ -13,11 +13,11 @@ class Organization(db.Model):
     phone = db.Column(db.String(20))
     email = db.Column(db.String(120))
     website = db.Column(db.String(255))
-    
+
     # Organization type: hospital, clinic, pharmacy, etc.
-    organization_type = db.Column(db.Enum('hospital', 'clinic', 'pharmacy', 'laboratory', 'other', 
-                                         name='organization_types'), 
-                                 nullable=False, default='clinic')
+    organization_type = db.Column(db.Enum('hospital', 'clinic', 'pharmacy', 'laboratory', 'other',
+                                          name='organization_types'),
+                                  nullable=False, default='clinic')
     
     # Status and activity tracking
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -26,7 +26,7 @@ class Organization(db.Model):
     
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, 
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow,
                           onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
@@ -36,12 +36,12 @@ class Organization(db.Model):
         self.validate_code(code)
         self.code = code.upper()  # Always store codes in uppercase
         self.name = name.strip()
-        
+
         # Set optional fields
         for key, value in kwargs.items():
             if hasattr(self, key) and value is not None:
                 setattr(self, key, value)
-    
+
     @staticmethod
     def validate_code(code):
         """Validate organization code format"""
@@ -57,7 +57,7 @@ class Organization(db.Model):
             raise ValueError('Organization code can only contain letters, numbers, and hyphens')
         
         return True
-    
+
     def get_user_count(self):
         """Get the current number of users in this organization"""
         return self.users.filter_by(is_active=True).count()
@@ -65,7 +65,7 @@ class Organization(db.Model):
     def can_add_user(self):
         """Check if organization can add more users"""
         return self.get_user_count() < self.max_users
-    
+
     def to_dict(self):
         """Convert organization to dictionary"""
         return {
@@ -79,7 +79,7 @@ class Organization(db.Model):
             'max_users': self.max_users,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-    
+
     @classmethod
     def find_by_code(cls, code):
         """Find organization by code"""
@@ -93,7 +93,7 @@ class Organization(db.Model):
 
 class PasswordReset(db.Model):
     __tablename__ = 'password_resets'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -111,7 +111,7 @@ class PasswordReset(db.Model):
         self.user_id = user_id
         self.token = token
         self.expires_at = expires_at
-    
+
     def is_valid(self):
         """Check if token is still valid"""
         return not self.used and self.expires_at > datetime.utcnow()
@@ -120,13 +120,13 @@ class PasswordReset(db.Model):
         """Mark token as used"""
         self.used = True
         db.session.commit()
-    
+
     @classmethod
     def find_valid_token(cls, token):
         """Find a valid password reset token"""
         return cls.query.filter_by(token=token, used=False).filter(
             cls.expires_at > datetime.utcnow()
         ).first()
-    
+
     def __repr__(self):
         return f'<PasswordReset {self.token} for user {self.user_id}>'

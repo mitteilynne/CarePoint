@@ -715,7 +715,7 @@ export default function NewReceptionistDashboard() {
                       <div className="text-sm font-medium text-gray-900">
                         {patient.first_name} {patient.last_name}
                       </div>
-                      <div className="text-sm text-gray-500">{patient.patient_id} • {patient.phone}</div>
+                      <div className="text-sm text-gray-500">{patient.patient_id} ΓÇó {patient.phone}</div>
                     </div>
                   </div>
                   <span className={`px-2 py-1 text-xs rounded-full ${
@@ -788,7 +788,7 @@ export default function NewReceptionistDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label htmlFor="temperature" className="block text-sm font-medium text-gray-700 mb-1">
-                  Temperature (°C)
+                  Temperature (┬░C)
                 </label>
                 <input
                   type="number"
@@ -987,10 +987,10 @@ export default function NewReceptionistDashboard() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               >
-                <option value="emergency">🔴 Emergency (Immediate attention required)</option>
-                <option value="urgent">🟠 Urgent (Should be seen within 1 hour)</option>
-                <option value="less_urgent">🟡 Less Urgent (Can wait 2-4 hours)</option>
-                <option value="non_urgent">🟢 Non-Urgent (Can wait several hours)</option>
+                <option value="emergency">≡ƒö┤ Emergency (Immediate attention required)</option>
+                <option value="urgent">≡ƒƒá Urgent (Should be seen within 1 hour)</option>
+                <option value="less_urgent">≡ƒƒí Less Urgent (Can wait 2-4 hours)</option>
+                <option value="non_urgent">≡ƒƒó Non-Urgent (Can wait several hours)</option>
               </select>
             </div>
 
