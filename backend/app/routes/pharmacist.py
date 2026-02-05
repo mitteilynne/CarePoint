@@ -15,7 +15,7 @@ def get_prescriptions():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -60,7 +60,7 @@ def get_prescription_details(prescription_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -81,7 +81,7 @@ def dispense_prescription(prescription_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -147,7 +147,7 @@ def refer_prescription(prescription_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -186,7 +186,7 @@ def get_inventory():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -231,7 +231,7 @@ def add_inventory_item():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -281,7 +281,7 @@ def update_inventory_item(item_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -347,7 +347,7 @@ def delete_inventory_item(item_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -373,7 +373,7 @@ def get_patient_prescriptions(patient_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id
@@ -408,7 +408,7 @@ def get_pharmacist_stats():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'pharmacist':
+    if not user or user.role not in ['pharmacist', 'admin']:
         return jsonify({'error': 'Unauthorized access'}), 403
     
     organization_id = user.organization_id

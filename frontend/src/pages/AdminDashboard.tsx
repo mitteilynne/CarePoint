@@ -4,7 +4,7 @@ import api from '@/services/api';
 import DoctorDetailsModal from '@/components/DoctorDetailsModal';
 import LabTechDetailsModal from '@/components/LabTechDetailsModal';
 import ReceptionistDetailsModal from '@/components/ReceptionistDetailsModal';
-import { EmbeddedDoctorModule, EmbeddedReceptionistModule, EmbeddedLabTechModule } from '@/components/modules';
+import { EmbeddedDoctorModule, EmbeddedReceptionistModule, EmbeddedLabTechModule, EmbeddedPharmacistModule } from '@/components/modules';
 
 interface User {
   id: number;
@@ -79,7 +79,7 @@ interface PaginationInfo {
   has_next: boolean;
 }
 
-type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module';
+type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -946,6 +946,21 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </button>
+              
+              <button
+                onClick={() => setCurrentView('pharmacist_module')}
+                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-6 rounded-lg shadow-lg hover:from-teal-600 hover:to-teal-700 transition-all transform hover:scale-105"
+              >
+                <div className="flex items-center space-x-4">
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <div className="text-left">
+                    <h3 className="text-xl font-bold">Pharmacist Module</h3>
+                    <p className="text-teal-100 text-sm">Prescriptions, Inventory, Dispensing</p>
+                  </div>
+                </div>
+              </button>
             </div>
           </div>
         )}
@@ -962,7 +977,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Navigation - Hide when in module view */}
-        {!['doctor_module', 'receptionist_module', 'lab_tech_module'].includes(currentView) && (
+        {!['doctor_module', 'receptionist_module', 'lab_tech_module', 'pharmacist_module'].includes(currentView) && (
           <div className="bg-white shadow rounded-lg mb-6">
             <div className="border-b border-gray-200">
               <nav className="flex space-x-8 px-6 overflow-x-auto" aria-label="Tabs">
@@ -1027,6 +1042,9 @@ export default function AdminDashboard() {
                 onBack={() => setCurrentView('overview')} 
                 isEmbedded={true} 
               />
+            )}
+            {currentView === 'pharmacist_module' && (
+              <EmbeddedPharmacistModule />
             )}
           </div>
         )}
