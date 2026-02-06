@@ -269,7 +269,7 @@ export default function NewReceptionistDashboard() {
 
     setLoading(true);
     try {
-      const response = await api.post('/receptionist/appointments', {
+      await api.post('/receptionist/appointments', {
         ...appointmentData,
         appointment_datetime: appointmentData.appointment_date
       });
