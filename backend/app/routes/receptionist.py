@@ -82,7 +82,12 @@ def register_patient():
     
     try:
         # Generate patient ID if this is a new patient
-        patient_id = f"P{datetime.now().strftime('%Y%m%d')}{Patient.query.filter_by(organization_id=user.organization_id).count() + 1:04d}"
+        today_str = datetime.now().strftime('%Y%m%d')
+        patient_count = Patient.query.filter_by(
+            organization_id=user.organization_id,
+            registration_date=date.today()
+        ).count()
+        patient_id = f"P{today_str}{patient_count + 1:04d}"
         
         # Create new patient
         patient = Patient(
@@ -92,11 +97,11 @@ def register_patient():
             last_name=data['last_name'],
             phone=data['phone'],
             email=data.get('email'),
-            date_of_birth=datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date() if data.get('date_of_birth') else None,
+            date_of_birth=datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date() if data.get('date_of_birth') and data['date_of_birth'].strip() else None,
             gender=data.get('gender', 'male'),
             address=data.get('address'),
-            emergency_contact_name=data.get('emergency_contact_name'),
-            emergency_contact_phone=data.get('emergency_contact_phone'),
+            emergency_contact=data.get('emergency_contact_name'),  # Fixed field name
+            emergency_phone=data.get('emergency_contact_phone'),   # Fixed field name
             visit_type=data.get('visit_type', 'walk_in'),
             registration_status='registered',
             registration_date=date.today(),
@@ -112,6 +117,11 @@ def register_patient():
         }), 201
     except Exception as e:
         db.session.rollback()
+        # Better error logging
+        import traceback
+        print(f"ERROR in patient registration: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        print(f"Data received: {data}")
         return jsonify({'error': str(e)}), 500
 
 

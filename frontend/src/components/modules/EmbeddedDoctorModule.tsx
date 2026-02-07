@@ -84,7 +84,7 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
 
   const loadQueueStatus = async () => {
     try {
-      const response = await api.get('/receptionist/queue/status');
+      const response = await api.get('/receptionist/queue');
       setQueueStatus(response.data);
     } catch (error) {
       console.error('Failed to load queue status:', error);

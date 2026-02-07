@@ -16,7 +16,7 @@ class Patient(db.Model):
     # Personal information
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
-    date_of_birth = db.Column(db.Date, nullable=False)
+    date_of_birth = db.Column(db.Date)  # Made nullable
     gender = db.Column(db.Enum('male', 'female', 'other', name='gender_types'), nullable=False)
     blood_type = db.Column(db.String(5))  # A+, B-, O+, etc.
     
@@ -58,6 +58,31 @@ class Patient(db.Model):
     def name(self):
         """Return full name of the patient"""
         return f"{self.first_name} {self.last_name}"
+    
+    def to_dict(self):
+        """Convert patient object to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'patient_id': self.patient_id,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'name': self.name,
+            'phone': self.phone,
+            'email': self.email,
+            'date_of_birth': self.date_of_birth.isoformat() if self.date_of_birth else None,
+            'gender': self.gender,
+            'address': self.address,
+            'emergency_contact': self.emergency_contact,
+            'emergency_phone': self.emergency_phone,
+            'visit_type': self.visit_type,
+            'registration_status': self.registration_status,
+            'current_queue_number': self.current_queue_number,
+            'registration_date': self.registration_date.isoformat() if self.registration_date else None,
+            'registered_at': self.registered_at.isoformat() if self.registered_at else None,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
     
     # Organization-scoped unique constraint for patient_id
     __table_args__ = (
