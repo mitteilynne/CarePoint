@@ -5,8 +5,9 @@ import api from '@/services/api';
 import DoctorDetailsModal from '@/components/DoctorDetailsModal';
 import LabTechDetailsModal from '@/components/LabTechDetailsModal';
 import ReceptionistDetailsModal from '@/components/ReceptionistDetailsModal';
-import AdminSidebar, { getAdminSidebarItems } from '@/components/AdminSidebar';
+import AdminSidebar, { getEnhancedAdminSidebarItems } from '@/components/AdminSidebar';
 import { EmbeddedDoctorModule, EmbeddedReceptionistModule, EmbeddedLabTechModule, EmbeddedPharmacistModule } from '@/components/modules';
+import { ClipboardDocumentListIcon, BeakerIcon, BuildingOffice2Icon, CogIcon } from '@heroicons/react/24/outline';
 
 interface User {
   id: number;
@@ -873,6 +874,115 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const renderPharmacistDashboard = () => (
+    <div className="space-y-6">
+      {/* Quick Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <ClipboardDocumentListIcon className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Total Prescriptions</p>
+              <p className="text-2xl font-bold text-gray-900">247</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <BeakerIcon className="w-5 h-5 text-green-600" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Dispensed Today</p>
+              <p className="text-2xl font-bold text-gray-900">32</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                <BuildingOffice2Icon className="w-5 h-5 text-yellow-600" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Low Stock Items</p>
+              <p className="text-2xl font-bold text-gray-900">15</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                <CogIcon className="w-5 h-5 text-red-600" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Expiring Soon</p>
+              <p className="text-2xl font-bold text-gray-900">8</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Access to Pharmacist Module */}
+      <div className="bg-gradient-to-r from-teal-500 to-teal-600 p-6 rounded-lg shadow-md text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold mb-2">Pharmacist Module</h3>
+            <p className="text-teal-100">
+              Access the full pharmacist interface for complete prescription and inventory management
+            </p>
+          </div>
+          <button
+            onClick={() => setCurrentView('pharmacist_module')}
+            className="bg-white text-teal-600 px-6 py-3 rounded-lg font-semibold hover:bg-teal-50 transition-colors"
+          >
+            Open Module
+          </button>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold mb-4">Recent Pharmacy Activity</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+            <div>
+              <p className="font-medium">Prescription #PX-2024-001</p>
+              <p className="text-sm text-gray-600">Amoxicillin 500mg - Dispensed to John Doe</p>
+            </div>
+            <span className="text-xs text-gray-500">10 mins ago</span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+            <div>
+              <p className="font-medium">Stock Alert</p>
+              <p className="text-sm text-gray-600">Paracetamol 500mg running low (15 units left)</p>
+            </div>
+            <span className="text-xs text-gray-500">25 mins ago</span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+            <div>
+              <p className="font-medium">Prescription #PX-2024-002</p>
+              <p className="text-sm text-gray-600">Ibuprofen 400mg - Dispensed to Sarah Smith</p>
+            </div>
+            <span className="text-xs text-gray-500">1 hour ago</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // Handle logout
   const handleLogout = () => {
     logout();
@@ -887,7 +997,7 @@ export default function AdminDashboard() {
   };
 
   // Get sidebar items with counts
-  const sidebarItems = getAdminSidebarItems({
+  const sidebarItems = getEnhancedAdminSidebarItems({
     users: overview?.total_users,
     doctors: overview?.role_counts?.doctor,
     receptionists: overview?.role_counts?.receptionist,
@@ -931,9 +1041,10 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-bold text-gray-900">
               {currentView === 'overview' && 'Dashboard Overview'}
               {currentView === 'users' && 'All Users'}
-              {currentView === 'doctors' && 'Doctors Management'}
+              {currentView === 'doctors' && 'Doctors Management'} 
               {currentView === 'receptionists' && 'Receptionists Management'}
               {currentView === 'lab_technicians' && 'Lab Technicians Management'}
+              {currentView === 'pharmacist_dashboard' && 'Pharmacist Dashboard'}
               {currentView === 'organization' && 'Organization Settings'}
               {currentView === 'doctor_module' && 'Doctor Module'}
               {currentView === 'receptionist_module' && 'Receptionist Module'}
@@ -943,6 +1054,14 @@ export default function AdminDashboard() {
             {currentView === 'overview' && (
               <p className="mt-2 text-gray-600">
                 Manage users and view system overview
+              </p>
+            )}
+            {(currentView.endsWith('_module') || currentView.endsWith('_dashboard')) && (
+              <p className="mt-2 text-gray-600">
+                {currentView.includes('doctor') && 'Manage patient consultations, medical records, and prescriptions'}
+                {currentView.includes('receptionist') && 'Manage patient registration, triage, and queue management'}
+                {currentView.includes('lab') && 'Manage lab tests, sample processing, and results'}
+                {currentView.includes('pharmacist') && 'Manage prescriptions, inventory, and drug dispensing'}
               </p>
             )}
           </div>
@@ -1040,6 +1159,7 @@ export default function AdminDashboard() {
               {currentView === 'doctors' && renderDoctorsView()}
               {currentView === 'lab_technicians' && renderLabTechniciansView()}
               {currentView === 'receptionists' && renderReceptionistsView()}
+              {currentView === 'pharmacist_dashboard' && renderPharmacistDashboard()}
               {currentView === 'organization' && renderOrganization()}
               
               {/* Embedded Module Views */}
