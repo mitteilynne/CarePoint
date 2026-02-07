@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import AdminSidebar, { getSuperAdminSidebarItems } from '@/components/AdminSidebar';
 import api from '@/services/api';
 
 type ViewMode = 'overview' | 'organizations' | 'organization_details' | 'create_organization';
@@ -239,92 +241,81 @@ export default function SuperAdminDashboard() {
     }
   }, [viewMode, fetchOverview, fetchOrganizations]);
 
+  // Handle logout
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  // Handle view change
+  const handleViewChange = (view: string) => {
+    setViewMode(view as ViewMode);
+    setError('');
+    setSuccessMessage('');
+  };
+
+  // Get sidebar items with counts
+  const sidebarItems = getSuperAdminSidebarItems({
+    organizations: overview?.organizations.total,
+    totalUsers: overview?.users.total
+  });
+
   // Render loading state
   if (loading && viewMode === 'overview' && !overview) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="flex h-screen bg-gray-50">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-indigo-700 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Super Admin Dashboard</h1>
-              <p className="text-indigo-200 text-sm">Platform Administration</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-white">
-                Welcome, {user?.first_name} {user?.last_name}
-              </span>
-              <button
-                onClick={logout}
-                className="bg-indigo-800 text-white px-4 py-2 rounded-lg hover:bg-indigo-900 transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation Tabs */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setViewMode('overview')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                viewMode === 'overview'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Platform Overview
-            </button>
-            <button
-              onClick={() => setViewMode('organizations')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                viewMode === 'organizations' || viewMode === 'organization_details'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Organizations
-            </button>
-            <button
-              onClick={() => setViewMode('create_organization')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                viewMode === 'create_organization'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              + New Organization
-            </button>
-          </nav>
-        </div>
-      </div>
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <AdminSidebar
+        currentView={viewMode}
+        onViewChange={handleViewChange}
+        items={sidebarItems}
+        onLogout={handleLogout}
+        userInfo={{
+          name: `${user?.first_name} ${user?.last_name}`,
+          role: 'Super Admin'
+        }}
+      />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Messages */}
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
-            <button onClick={() => setError('')} className="float-right font-bold">&times;</button>
+      <div className="flex-1 lg:ml-64 overflow-auto">
+        <div className="p-6 pt-16 lg:pt-6">
+          {/* Page Header */}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-900">
+              {viewMode === 'overview' && 'Platform Overview'}
+              {viewMode === 'organizations' && 'Organizations Management'}
+              {viewMode === 'organization_details' && 'Organization Details'}
+              {viewMode === 'create_organization' && 'Create Organization'}
+            </h1>
+            <p className="mt-2 text-gray-600">
+              {viewMode === 'overview' && 'Monitor and manage the entire healthcare platform'}
+              {viewMode === 'organizations' && 'View and manage all organizations on the platform'}
+              {viewMode === 'organization_details' && 'Detailed view of selected organization'}
+              {viewMode === 'create_organization' && 'Add a new organization to the platform'}
+            </p>
           </div>
-        )}
-        {successMessage && (
-          <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-            {successMessage}
-          </div>
-        )}
+
+          {/* Messages */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {error}
+              <button onClick={() => setError('')} className="float-right font-bold">&times;</button>
+            </div>
+          )}
+          {successMessage && (
+            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+              {successMessage}
+            </div>
+          )}
 
         {/* Overview View */}
         {viewMode === 'overview' && overview && (
@@ -878,7 +869,8 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
         )}
-      </main>
+        </div>
+      </div>
     </div>
   );
 }

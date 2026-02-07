@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import DoctorDetailsModal from '@/components/DoctorDetailsModal';
 import LabTechDetailsModal from '@/components/LabTechDetailsModal';
 import ReceptionistDetailsModal from '@/components/ReceptionistDetailsModal';
+import AdminSidebar, { getAdminSidebarItems } from '@/components/AdminSidebar';
 import { EmbeddedDoctorModule, EmbeddedReceptionistModule, EmbeddedLabTechModule, EmbeddedPharmacistModule } from '@/components/modules';
 
 interface User {
@@ -82,7 +84,8 @@ interface PaginationInfo {
 type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module';
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [currentView, setCurrentView] = useState<ViewMode>('overview');
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -870,13 +873,35 @@ export default function AdminDashboard() {
     </div>
   );
 
+  // Handle logout
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  // Handle view change
+  const handleViewChange = (view: string) => {
+    setCurrentView(view as ViewMode);
+    setCurrentPage(1);
+    setMessage({ type: '', text: '' });
+  };
+
+  // Get sidebar items with counts
+  const sidebarItems = getAdminSidebarItems({
+    users: overview?.total_users,
+    doctors: overview?.role_counts?.doctor,
+    receptionists: overview?.role_counts?.receptionist,
+    labTechs: overview?.role_counts?.lab_technician
+  });
+
   if (!user || user.role !== 'admin') {
     return (
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <div className="text-red-800">
-              Access denied. Admin privileges required.
+      <div className="flex h-screen bg-gray-50">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="bg-red-50 border border-red-200 rounded-md p-8 max-w-md">
+            <div className="text-red-800 text-center">
+              <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+              <p>Admin privileges required to access this dashboard.</p>
             </div>
           </div>
         </div>
@@ -885,42 +910,78 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <div className="px-4 py-6 sm:px-0">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Admin Dashboard
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Manage users and view system overview
-          </p>
-        </div>
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <AdminSidebar
+        currentView={currentView}
+        onViewChange={handleViewChange}
+        items={sidebarItems}
+        onLogout={handleLogout}
+        userInfo={{
+          name: `${user.first_name} ${user.last_name}`,
+          role: user.role
+        }}
+      />
 
-        {/* Module Access Cards - Show only on overview */}
-        {currentView === 'overview' && (
+      {/* Main Content */}
+      <div className="flex-1 lg:ml-64 overflow-auto">
+        <div className="p-6 pt-16 lg:pt-6">
+          {/* Page Header */}
           <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">Access Full Modules</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                onClick={() => setCurrentView('doctor_module')}
-                className="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105"
-              >
-                <div className="flex items-center space-x-4">
-                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div className="text-left">
-                    <h3 className="text-xl font-bold">Doctor Module</h3>
-                    <p className="text-green-100 text-sm">Queue, Consultations, Lab Tests, Records</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {currentView === 'overview' && 'Dashboard Overview'}
+              {currentView === 'users' && 'All Users'}
+              {currentView === 'doctors' && 'Doctors Management'}
+              {currentView === 'receptionists' && 'Receptionists Management'}
+              {currentView === 'lab_technicians' && 'Lab Technicians Management'}
+              {currentView === 'organization' && 'Organization Settings'}
+              {currentView === 'doctor_module' && 'Doctor Module'}
+              {currentView === 'receptionist_module' && 'Receptionist Module'}
+              {currentView === 'lab_tech_module' && 'Lab Technician Module'}
+              {currentView === 'pharmacist_module' && 'Pharmacist Module'}
+            </h1>
+            {currentView === 'overview' && (
+              <p className="mt-2 text-gray-600">
+                Manage users and view system overview
+              </p>
+            )}
+          </div>
+
+          {/* Error/Success Messages */}
+          {message.text && (
+            <div className={`mb-6 p-4 rounded-md ${
+              message.type === 'error' 
+                ? 'bg-red-50 border border-red-200 text-red-700' 
+                : 'bg-green-50 border border-green-200 text-green-700'
+            }`}>
+              {message.text}
+            </div>
+          )}
+
+          {/* Module Access Cards - Show only on overview */}
+          {currentView === 'overview' && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-4 text-gray-800">Access Full Modules</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button
+                  onClick={() => setCurrentView('doctor_module')}
+                  className="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105"
+                >
+                  <div className="flex items-center space-x-4">
+                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="text-left">
+                      <h3 className="text-xl font-bold">Doctor Module</h3>
+                      <p className="text-green-100 text-sm">Consultations & Records</p>
+                    </div>
                   </div>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => setCurrentView('receptionist_module')}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105"
-              >
+                </button>
+                
+                <button
+                  onClick={() => setCurrentView('receptionist_module')}
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105"
+                >
                 <div className="flex items-center space-x-4">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -965,120 +1026,78 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Message Display */}
-        {message.text && (
-          <div className={`mb-6 p-4 rounded-md ${
-            message.type === 'error' 
-              ? 'bg-red-50 border border-red-200 text-red-700' 
-              : 'bg-green-50 border border-green-200 text-green-700'
-          }`}>
-            {message.text}
-          </div>
-        )}
 
-        {/* Navigation - Hide when in module view */}
-        {!['doctor_module', 'receptionist_module', 'lab_tech_module', 'pharmacist_module'].includes(currentView) && (
-          <div className="bg-white shadow rounded-lg mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="flex space-x-8 px-6 overflow-x-auto" aria-label="Tabs">
-                {[
-                  { key: 'overview', label: 'Overview' },
-                  { key: 'users', label: 'All Users' },
-                  { key: 'doctors', label: 'Doctors' },
-                  { key: 'receptionists', label: 'Receptionists' },
-                  { key: 'lab_technicians', label: 'Lab Technicians' },
-                  { key: 'organization', label: 'Organization' }
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => {
-                      setCurrentView(tab.key as ViewMode);
-                      setCurrentPage(1);
-                      setMessage({ type: '', text: '' });
-                    }}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                      currentView === tab.key
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </nav>
+
+          {/* Content */}
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div>
+              {currentView === 'overview' && renderOverview()}
+              {currentView === 'users' && renderUserTable()}
+              {currentView === 'doctors' && renderDoctorsView()}
+              {currentView === 'lab_technicians' && renderLabTechniciansView()}
+              {currentView === 'receptionists' && renderReceptionistsView()}
+              {currentView === 'organization' && renderOrganization()}
+              
+              {/* Embedded Module Views */}
+              {currentView === 'doctor_module' && (
+                <EmbeddedDoctorModule 
+                  onBack={() => setCurrentView('overview')} 
+                  isEmbedded={true} 
+                />
+              )}
+              {currentView === 'receptionist_module' && (
+                <EmbeddedReceptionistModule 
+                  onBack={() => setCurrentView('overview')} 
+                  isEmbedded={true} 
+                />
+              )}
+              {currentView === 'lab_tech_module' && (
+                <EmbeddedLabTechModule 
+                  onBack={() => setCurrentView('overview')} 
+                  isEmbedded={true} 
+                />
+              )}
+              {currentView === 'pharmacist_module' && (
+                <EmbeddedPharmacistModule 
+                  onBack={() => setCurrentView('overview')} 
+                  isEmbedded={true} 
+                />
+              )}
+            </div>
+          )}
 
-        {/* Content */}
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <div>
-            {currentView === 'overview' && renderOverview()}
-            {currentView === 'users' && renderUserTable()}
-            {currentView === 'doctors' && renderDoctorsView()}
-            {currentView === 'lab_technicians' && renderLabTechniciansView()}
-            {currentView === 'receptionists' && renderReceptionistsView()}
-            {currentView === 'organization' && renderOrganization()}
-            
-            {/* Embedded Module Views */}
-            {currentView === 'doctor_module' && (
-              <EmbeddedDoctorModule 
-                onBack={() => setCurrentView('overview')} 
-                isEmbedded={true} 
-              />
-            )}
-            {currentView === 'receptionist_module' && (
-              <EmbeddedReceptionistModule 
-                onBack={() => setCurrentView('overview')} 
-                isEmbedded={true} 
-              />
-            )}
-            {currentView === 'lab_tech_module' && (
-              <EmbeddedLabTechModule 
-                onBack={() => setCurrentView('overview')} 
-                isEmbedded={true} 
-              />
-            )}
-            {currentView === 'pharmacist_module' && (
-              <EmbeddedPharmacistModule 
-                onBack={() => setCurrentView('overview')} 
-                isEmbedded={true} 
-              />
-            )}
-          </div>
-        )}
-
-        {/* Detail Modals */}
-        {selectedDoctorId && (
-          <DoctorDetailsModal
-            doctorId={selectedDoctorId}
-            doctorName={doctorsSummary.find(d => d.id === selectedDoctorId)?.name || ''}
-            isOpen={!!selectedDoctorId}
-            onClose={() => setSelectedDoctorId(null)}
-          />
-        )}
-        
-        {selectedLabTechId && (
-          <LabTechDetailsModal
-            techId={selectedLabTechId}
-            techName={labTechsSummary.find(t => t.id === selectedLabTechId)?.name || ''}
-            isOpen={!!selectedLabTechId}
-            onClose={() => setSelectedLabTechId(null)}
-          />
-        )}
-        
-        {selectedReceptionistId && (
-          <ReceptionistDetailsModal
-            receptionistId={selectedReceptionistId}
-            receptionistName={receptionistsSummary.find(r => r.id === selectedReceptionistId)?.name || ''}
-            isOpen={!!selectedReceptionistId}
-            onClose={() => setSelectedReceptionistId(null)}
-          />
-        )}
+          {/* Detail Modals */}
+          {selectedDoctorId && (
+            <DoctorDetailsModal
+              doctorId={selectedDoctorId}
+              doctorName={doctorsSummary.find(d => d.id === selectedDoctorId)?.name || ''}
+              isOpen={!!selectedDoctorId}
+              onClose={() => setSelectedDoctorId(null)}
+            />
+          )}
+          
+          {selectedLabTechId && (
+            <LabTechDetailsModal
+              labTechId={selectedLabTechId}
+              labTechName={labTechsSummary.find(l => l.id === selectedLabTechId)?.name || ''}
+              isOpen={!!selectedLabTechId}
+              onClose={() => setSelectedLabTechId(null)}
+            />
+          )}
+          
+          {selectedReceptionistId && (
+            <ReceptionistDetailsModal
+              receptionistId={selectedReceptionistId}
+              receptionistName={receptionistsSummary.find(r => r.id === selectedReceptionistId)?.name || ''}
+              isOpen={!!selectedReceptionistId}
+              onClose={() => setSelectedReceptionistId(null)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
