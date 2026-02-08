@@ -455,67 +455,188 @@ export default function DoctorDashboard() {
           </div>
         </div>
 
-        {queueStatus && queueStatus.waiting_patients && queueStatus.waiting_patients.length === 0 ? (
+        {queueStatus && queueStatus.all_patients && queueStatus.all_patients.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <p>No patients in queue</p>
           </div>
-        ) : queueStatus && queueStatus.waiting_patients ? (
-          <div className="space-y-4">
-            {queueStatus.waiting_patients.map((patient) => (
-              <div
-                key={patient.id}
-                className={`border-l-4 p-4 rounded-lg ${getTreatmentPriorityColor(patient.triage_level)} border`}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center mb-2">
-                      <span className="text-lg font-bold mr-3">#{patient.queue_number}</span>
-                      <h3 className="text-lg font-semibold">{patient.patient_name}</h3>
-                      <span className={`ml-3 px-3 py-1 text-sm rounded-full font-medium ${getTreatmentPriorityColor(patient.triage_level)}`}>
-                        {patient.triage_level.replace('_', ' ').toUpperCase()}
-                      </span>
+        ) : queueStatus && (queueStatus.waiting_patients || queueStatus.in_progress_patients) ? (
+          <div className="space-y-6">
+            {/* Show ALL patients regardless of status */}
+            {queueStatus.waiting_patients && queueStatus.waiting_patients.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full mr-2">Waiting</span>
+                  {queueStatus.waiting_patients.length} patients
+                </h3>
+                <div className="space-y-4">
+                  {queueStatus.waiting_patients.map((patient) => (
+                    <div
+                      key={patient.id}
+                      className={`border-l-4 p-4 rounded-lg bg-yellow-50 border-yellow-300`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-2">
+                            <span className="text-lg font-bold mr-3">#{patient.queue_number}</span>
+                            <h3 className="text-lg font-semibold">{patient.patient_name}</h3>
+                            <span className={`ml-3 px-3 py-1 text-sm rounded-full font-medium ${getTreatmentPriorityColor(patient.triage_level)}`}>
+                              {patient.triage_level.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </div>
+                          <p className="text-gray-700 mb-2"><strong>Chief Complaint:</strong> {patient.chief_complaint}</p>
+                          <div className="text-sm text-gray-600">
+                            <span>Waiting: {patient.wait_time_minutes} minutes</span>
+                            <span className="mx-2">•</span>
+                            <span>Arrived: {new Date(patient.arrival_time).toLocaleTimeString()}</span>
+                            <span className="mx-2">•</span>
+                            <span>Priority Score: {patient.priority_score}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col space-y-2 ml-4">
+                          <button
+                            onClick={() => handlePatientAction(patient.id, 'in_progress')}
+                            disabled={loading}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                          >
+                            ▶️ Start Consultation
+                          </button>
+                          <button
+                            onClick={() => orderLabTestForPatient(parseInt(patient.patient_id))}
+                            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                          >
+                            🧪 Order Lab Test
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-gray-700 mb-2"><strong>Chief Complaint:</strong> {patient.chief_complaint}</p>
-                    <div className="text-sm text-gray-600">
-                      <span>Waiting: {patient.wait_time_minutes} minutes</span>
-                      <span className="mx-2">•</span>
-                      <span>Arrived: {new Date(patient.arrival_time).toLocaleTimeString()}</span>
-                      <span className="mx-2">•</span>
-                      <span>Priority Score: {patient.priority_score}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col space-y-2 ml-4">
-                    <button
-                      onClick={() => handlePatientAction(patient.id, 'in_progress')}
-                      disabled={loading}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                    >
-                      Start Consultation
-                    </button>
-                    <button
-                      onClick={() => orderLabTestForPatient(parseInt(patient.patient_id))}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-                    >
-                      Order Lab Test
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedPatient(patient);
-                        // Here you could open a detailed view or triage modal
-                      }}
-                      className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      View Details
-                    </button>
-                  </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Show In Progress patients */}
+            {queueStatus.in_progress_patients && queueStatus.in_progress_patients.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full mr-2">In Consultation</span>
+                  {queueStatus.in_progress_patients.length} patients
+                </h3>
+                <div className="space-y-4">
+                  {queueStatus.in_progress_patients.map((patient) => (
+                    <div
+                      key={patient.id}
+                      className={`border-l-4 p-4 rounded-lg bg-blue-50 border-blue-300`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-2">
+                            <span className="text-lg font-bold mr-3">#{patient.queue_number}</span>
+                            <h3 className="text-lg font-semibold">{patient.patient_name}</h3>
+                            <span className={`ml-3 px-3 py-1 text-sm rounded-full font-medium ${getTreatmentPriorityColor(patient.triage_level)}`}>
+                              {patient.triage_level.replace('_', ' ').toUpperCase()}
+                            </span>
+                            <span className="ml-3 px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800">
+                              IN CONSULTATION
+                            </span>
+                          </div>
+                          <p className="text-gray-700 mb-2"><strong>Chief Complaint:</strong> {patient.chief_complaint}</p>
+                          <div className="text-sm text-gray-600">
+                            <span>In consultation: {patient.wait_time_minutes} minutes total</span>
+                            <span className="mx-2">•</span>
+                            <span>Arrived: {new Date(patient.arrival_time).toLocaleTimeString()}</span>
+                            <span className="mx-2">•</span>
+                            <span>Priority Score: {patient.priority_score}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col space-y-2 ml-4">
+                          <button
+                            onClick={() => handlePatientAction(patient.id, 'completed')}
+                            disabled={loading}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          >
+                            ✅ Complete Consultation
+                          </button>
+                          <button
+                            onClick={() => orderLabTestForPatient(parseInt(patient.patient_id))}
+                            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                          >
+                            🧪 Order Lab Test
+                          </button>
+                          <button
+                            onClick={() => {
+                              setCurrentView('patient-records');
+                              loadPatientRecords(parseInt(patient.patient_id));
+                              setSearchQuery(patient.patient_name);
+                            }}
+                            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                          >
+                            📋 View Records
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Show completed patients if any */}
+            {queueStatus.completed_patients && queueStatus.completed_patients.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2">Completed Today</span>
+                  {queueStatus.completed_patients.length} patients
+                </h3>
+                <div className="space-y-4">
+                  {queueStatus.completed_patients.map((patient) => (
+                    <div
+                      key={patient.id}
+                      className={`border-l-4 p-4 rounded-lg bg-green-50 border-green-300`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-2">
+                            <span className="text-lg font-bold mr-3">#{patient.queue_number}</span>
+                            <h3 className="text-lg font-semibold">{patient.patient_name}</h3>
+                            <span className="ml-3 px-3 py-1 text-sm rounded-full bg-green-100 text-green-800">
+                              COMPLETED
+                            </span>
+                          </div>
+                          <p className="text-gray-700 mb-2"><strong>Chief Complaint:</strong> {patient.chief_complaint}</p>
+                          <div className="text-sm text-gray-600">
+                            <span>Total time: {patient.wait_time_minutes} minutes</span>
+                            <span className="mx-2">•</span>
+                            <span>Completed: {new Date(patient.arrival_time).toLocaleTimeString()}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col space-y-2 ml-4">
+                          <button
+                            onClick={() => {
+                              setCurrentView('patient-records');
+                              loadPatientRecords(parseInt(patient.patient_id));
+                              setSearchQuery(patient.patient_name);
+                            }}
+                            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                          >
+                            📋 View Records
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        ) : null}
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p>Loading patient queue...</p>
+          </div>
+        )}
       </div>
     </div>
   );

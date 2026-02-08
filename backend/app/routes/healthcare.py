@@ -895,14 +895,20 @@ def get_doctor_queue():
         # Get current queue number
         current_number = max([t.queue_number for t in triages]) if triages else 0
         
-        # Format waiting patients
+        # Format patients by status
         waiting_patients = []
-        for triage in sorted([t for t in triages if t.queue_status == 'waiting'], 
-                           key=lambda x: (x.priority_score, x.created_at)):
+        in_progress_patients = []
+        completed_patients = []
+        all_patients = []
+        
+        # Sort triages by priority and arrival time for consistent ordering
+        sorted_triages = sorted(triages, key=lambda x: (x.priority_score, x.created_at))
+        
+        for triage in sorted_triages:
             patient = triage.patient
             if patient:
                 wait_minutes = int((datetime.utcnow() - triage.created_at).total_seconds() / 60)
-                waiting_patients.append({
+                patient_data = {
                     'id': triage.id,
                     'patient_id': str(patient.id),
                     'patient_name': f"{patient.first_name} {patient.last_name}",
@@ -911,9 +917,20 @@ def get_doctor_queue():
                     'chief_complaint': triage.chief_complaint,
                     'arrival_time': triage.created_at.isoformat(),
                     'wait_time_minutes': wait_minutes,
-                    'priority_score': triage.priority_score
-                })
-        
+                    'priority_score': triage.priority_score,
+                    'status': triage.queue_status
+                }
+                
+                all_patients.append(patient_data)
+                
+                # Categorize by status
+                if triage.queue_status == 'waiting':
+                    waiting_patients.append(patient_data)
+                elif triage.queue_status == 'in_progress':
+                    in_progress_patients.append(patient_data)
+                elif triage.queue_status == 'completed':
+                    completed_patients.append(patient_data)
+
         return jsonify({
             'queue_management': {
                 'current_number': current_number,
@@ -928,7 +945,10 @@ def get_doctor_queue():
                 'in_progress': in_progress_count,
                 'completed': completed_count
             },
-            'waiting_patients': waiting_patients
+            'waiting_patients': waiting_patients,
+            'in_progress_patients': in_progress_patients,
+            'completed_patients': completed_patients,
+            'all_patients': all_patients
         })
     except Exception as e:
         print(f"Error in get_doctor_queue: {str(e)}")
