@@ -23,6 +23,114 @@ import traceback
 
 bp = Blueprint('healthcare', __name__, url_prefix='/api/healthcare')
 
+def parse_medication_string(med_string):
+    """
+    Parse a medication string into structured prescription data.
+    
+    Examples:
+    - "Amoxicillin 500mg twice daily for 7 days"
+    - "Ibuprofen 200mg every 6 hours as needed for pain"
+    - "Metformin 1000mg 2x daily x30d"
+    
+    Returns dict with: medication, dosage, frequency, duration, quantity, instructions
+    """
+    import re
+    
+    med_string = med_string.strip()
+    if not med_string:
+        return None
+    
+    result = {
+        'medication': '',
+        'dosage': 'As directed',
+        'frequency': 'As directed', 
+        'duration': 'As directed',
+        'quantity': 30,  # Default quantity
+        'instructions': ''
+    }
+    
+    # Extract medication name (usually the first word(s) before dosage)
+    # Look for dosage pattern (number + mg/g/ml etc)
+    dosage_match = re.search(r'(\d+(?:\.\d+)?)\s*(mg|g|ml|mcg|units?|iu)', med_string.lower())
+    
+    if dosage_match:
+        dosage_start = dosage_match.start()
+        result['medication'] = med_string[:dosage_start].strip()
+        result['dosage'] = dosage_match.group(0)
+        
+        # Extract the rest of the string after dosage
+        rest_string = med_string[dosage_match.end():].strip()
+    else:
+        # No dosage pattern found, try to extract first 1-2 words as medication
+        words = med_string.split()
+        result['medication'] = ' '.join(words[:2]) if len(words) >= 2 else words[0] if words else med_string
+        rest_string = ' '.join(words[2:]) if len(words) > 2 else ''
+    
+    # Extract frequency patterns
+    frequency_patterns = [
+        (r'(?:once|1x?)\s*(?:daily|day|per\s+day)', 'Once daily'),
+        (r'(?:twice|2x?)\s*(?:daily|day|per\s+day)', 'Twice daily'),
+        (r'(?:3x?|three\s*times?)\s*(?:daily|day|per\s+day)', 'Three times daily'),
+        (r'(?:4x?|four\s*times?)\s*(?:daily|day|per\s+day)', 'Four times daily'),
+        (r'every\s+(\d+)\s*(?:hours?|hrs?)', lambda m: f'Every {m.group(1)} hours'),
+        (r'every\s+(\d+)\s*(?:days?)', lambda m: f'Every {m.group(1)} days'),
+        (r'as\s+needed|prn|when\s+needed', 'As needed'),
+    ]
+    
+    for pattern, replacement in frequency_patterns:
+        match = re.search(pattern, rest_string.lower())
+        if match:
+            if callable(replacement):
+                result['frequency'] = replacement(match)
+            else:
+                result['frequency'] = replacement
+            break
+    
+    # Extract duration patterns
+    duration_patterns = [
+        (r'(?:for\s+)?(\d+)\s*(?:days?|d)', lambda m: f'{m.group(1)} days'),
+        (r'(?:for\s+)?(\d+)\s*(?:weeks?|w)', lambda m: f'{int(m.group(1))*7} days'),
+        (r'(?:for\s+)?(\d+)\s*(?:months?|mo)', lambda m: f'{m.group(1)} months'),
+        (r'x\s*(\d+)d', lambda m: f'{m.group(1)} days'),
+        (r'x\s*(\d+)w', lambda m: f'{int(m.group(1))*7} days'),
+    ]
+    
+    for pattern, replacement in duration_patterns:
+        match = re.search(pattern, rest_string.lower())
+        if match:
+            if callable(replacement):
+                result['duration'] = replacement(match)
+            else:
+                result['duration'] = replacement
+            
+            # Calculate quantity based on frequency and duration
+            try:
+                duration_days = int(re.search(r'(\d+)', result['duration']).group(1))
+                if 'once daily' in result['frequency'].lower():
+                    result['quantity'] = duration_days
+                elif 'twice daily' in result['frequency'].lower():
+                    result['quantity'] = duration_days * 2
+                elif 'three times' in result['frequency'].lower():
+                    result['quantity'] = duration_days * 3
+                elif 'four times' in result['frequency'].lower():
+                    result['quantity'] = duration_days * 4
+            except:
+                pass  # Keep default quantity
+            break
+    
+    # Extract any remaining instructions
+    instruction_keywords = ['with food', 'on empty stomach', 'for pain', 'for infection', 'as needed', 'prn']
+    for keyword in instruction_keywords:
+        if keyword in rest_string.lower():
+            result['instructions'] = rest_string.strip()
+            break
+    
+    # Ensure medication name is not empty
+    if not result['medication']:
+        result['medication'] = med_string.split()[0] if med_string.split() else 'Prescribed medication'
+    
+    return result
+
 # Patient routes
 @bp.route('/patients', methods=['GET'])
 @jwt_required()
@@ -290,6 +398,82 @@ def create_medical_record():
             except Exception as e:
                 print(f"Warning: Could not update lab test status: {e}")
         
+        # Create prescription records from medications_prescribed text
+        prescriptions_created = []
+        if data.get('medications_prescribed'):
+            try:
+                from app.models.healthcare import Prescription
+                medications_text = data['medications_prescribed'].strip()
+                
+                if medications_text:
+                    # Parse medications - support multiple formats
+                    # Format examples:
+                    # "Amoxicillin 500mg, twice daily, 7 days"
+                    # "Amoxicillin 500mg 2x/day x7d; Ibuprofen 200mg PRN pain"
+                    
+                    # Split by semicolon or newline first for multiple medications
+                    medication_lines = [line.strip() for line in medications_text.replace(';', '\n').split('\n') if line.strip()]
+                    
+                    for med_line in medication_lines:
+                        try:
+                            # Basic parsing - can be enhanced later
+                            prescription_data = parse_medication_string(med_line)
+                            
+                            if prescription_data:
+                                prescription = Prescription(
+                                    organization_id=org_id,
+                                    patient_id=data['patient_id'],
+                                    doctor_id=current_user_id,
+                                    medical_record_id=record.id,
+                                    medication_name=prescription_data['medication'],
+                                    dosage=prescription_data['dosage'],
+                                    frequency=prescription_data['frequency'],
+                                    duration=prescription_data['duration'],
+                                    quantity=prescription_data['quantity'],
+                                    instructions=prescription_data.get('instructions', '')
+                                )
+                                
+                                db.session.add(prescription)
+                                db.session.flush()  # Get the ID
+                                prescriptions_created.append({
+                                    'id': prescription.id,
+                                    'medication_name': prescription.medication_name,
+                                    'dosage': prescription.dosage
+                                })
+                                
+                        except Exception as e:
+                            print(f"Warning: Could not parse medication '{med_line}': {e}")
+                            # Create a basic prescription record with available info
+                            prescription = Prescription(
+                                organization_id=org_id,
+                                patient_id=data['patient_id'],
+                                doctor_id=current_user_id,
+                                medical_record_id=record.id,
+                                medication_name=med_line[:100],  # Truncate if too long
+                                dosage='As prescribed',
+                                frequency='As directed',
+                                duration='As directed',
+                                quantity=1,
+                                instructions='See medical record for details'
+                            )
+                            db.session.add(prescription)
+                            db.session.flush()
+                            prescriptions_created.append({
+                                'id': prescription.id,
+                                'medication_name': prescription.medication_name
+                            })
+                
+                if prescriptions_created:
+                    db.session.commit()
+                    print(f"DEBUG: Created {len(prescriptions_created)} prescriptions from diagnosis")
+                    
+            except Exception as e:
+                print(f"Warning: Could not create prescriptions from medications_prescribed: {e}")
+                # Don't fail the entire request if prescription creation fails
+                db.session.rollback()
+                db.session.add(record)  # Re-add the medical record
+                db.session.commit()
+        
         # Handle referral data separately if needed
         referral_data = {k: v for k, v in data.items() if k.startswith('referral_')}
         if referral_data.get('referral_type') and referral_data.get('referral_type') != 'none':
@@ -337,6 +521,10 @@ def create_medical_record():
                 'treatment_plan': record.treatment_plan
             }
         }
+        
+        if prescriptions_created:
+            response_data['prescriptions_created'] = prescriptions_created
+            response_data['message'] = f'Medical record created successfully with {len(prescriptions_created)} prescription(s)'
         
         if referral_id:
             response_data['referral_created'] = True

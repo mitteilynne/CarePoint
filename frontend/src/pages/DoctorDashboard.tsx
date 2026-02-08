@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Patient, LabTest, LabTestRequest, MedicalRecord, Notification } from '@/types';
-import api, { notificationsAPI } from '@/services/api';
+import api, { notificationsAPI, doctorAPI } from '@/services/api';
 import LabTestForm from '@/components/LabTestForm';
 import DiagnosisForm, { DiagnosisFormData } from '@/components/DiagnosisForm';
 
@@ -1416,6 +1416,8 @@ export default function DoctorDashboard() {
         {currentView === 'lab-tests' && renderLabTests()}
         {currentView === 'notifications' && renderNotifications()}
         {currentView === 'referrals' && renderReferrals()}
+
+
 
         {/* Lab Test Form Modal */}
         {showLabTestForm && (
