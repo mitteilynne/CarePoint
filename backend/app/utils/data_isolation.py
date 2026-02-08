@@ -228,12 +228,22 @@ class LabTestService(BaseOrganizationService):
         super().__init__(LabTest)
     
     def get_by_patient(self, patient_id):
-        """Get all lab tests for a specific patient"""
-        return self.get_query().filter(self.model_class.patient_id == patient_id).all()
+        """Get all lab tests for a specific patient within current organization"""
+        return self.get_organization_scoped_query().filter(
+            self.model_class.patient_id == patient_id
+        ).all()
     
     def get_by_status(self, status):
-        """Get lab tests by status"""
-        return self.get_query().filter(self.model_class.status == status).all()
+        """Get lab tests by status within current organization"""
+        return self.get_organization_scoped_query().filter(
+            self.model_class.status == status
+        ).all()
+    
+    def update(self, instance):
+        """Update a lab test instance"""
+        from app import db
+        db.session.commit()
+        return instance
 
 class ReferralService(BaseOrganizationService):
     def __init__(self):

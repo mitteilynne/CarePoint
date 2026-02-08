@@ -4,7 +4,7 @@ import api, { notificationsAPI } from '@/services/api';
 import LabTestForm from '@/components/LabTestForm';
 import DiagnosisForm, { DiagnosisFormData } from '@/components/DiagnosisForm';
 
-type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'lab-tests' | 'referrals' | 'notifications';
+type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'patient-records' | 'lab-tests' | 'referrals' | 'notifications';
 
 interface QueuePatient {
   id: number;
@@ -110,7 +110,7 @@ export default function DoctorDashboard() {
 
   const loadQueueStatus = async () => {
     try {
-      const response = await api.get('/receptionist/queue');
+      const response = await api.get('/healthcare/doctor/queue');
       setQueueStatus(response.data);
     } catch (error) {
       console.error('Failed to load queue status:', error);
@@ -156,7 +156,7 @@ export default function DoctorDashboard() {
   const handlePatientAction = async (triageId: number, action: string) => {
     setLoading(true);
     try {
-      await api.put(`/receptionist/queue/update-status/${triageId}`, {
+      await api.put(`/healthcare/doctor/queue/update-status/${triageId}`, {
         queue_status: action
       });
       showMessage('success', `Patient status updated to ${action.replace('_', ' ')}`);
@@ -176,7 +176,7 @@ export default function DoctorDashboard() {
     }
 
     try {
-      const response = await api.get(`/receptionist/patients/search?q=${encodeURIComponent(query)}`);
+      const response = await api.get(`/healthcare/doctor/patients/search?q=${encodeURIComponent(query)}`);
       setSearchResults(response.data.patients || []);
     } catch (error) {
       console.error('Search failed:', error);
@@ -455,16 +455,16 @@ export default function DoctorDashboard() {
           </div>
         </div>
 
-        {queueStatus && queueStatus.waiting_patients.length === 0 ? (
+        {queueStatus && queueStatus.waiting_patients && queueStatus.waiting_patients.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <p>No patients in queue</p>
           </div>
-        ) : (
+        ) : queueStatus && queueStatus.waiting_patients ? (
           <div className="space-y-4">
-            {queueStatus?.waiting_patients.map((patient) => (
+            {queueStatus.waiting_patients.map((patient) => (
               <div
                 key={patient.id}
                 className={`border-l-4 p-4 rounded-lg ${getTreatmentPriorityColor(patient.triage_level)} border`}
@@ -515,7 +515,7 @@ export default function DoctorDashboard() {
               </div>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -634,6 +634,75 @@ export default function DoctorDashboard() {
     </div>
   );
 
+  const renderPatientRecords = () => (
+    <div className="space-y-6">
+      {/* Header with Back Button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Patient Medical Records</h2>
+          <p className="text-gray-600">{searchQuery}</p>
+        </div>
+        <button
+          onClick={() => setCurrentView('records')}
+          className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+        >
+          ← Back to Search
+        </button>
+      </div>
+
+      {/* Medical Records Display */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Medical History ({medicalRecords.length} visits)
+        </h3>
+        
+        {medicalRecords.length === 0 ? (
+          <div className="text-center py-8 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">No medical records found for this patient.</p>
+            <p className="text-sm text-gray-400 mt-2">
+              Records will appear here once you create a consultation for this patient.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {medicalRecords.map((record) => (
+              <div key={record.id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <p className="text-sm text-gray-600">Visit Date: {new Date(record.visit_date).toLocaleDateString()}</p>
+                  </div>
+                  <span className="text-sm text-gray-500">Dr. {record.doctor_name}</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p><strong>Chief Complaint:</strong> {record.chief_complaint}</p>
+                    <p><strong>Diagnosis:</strong> {record.diagnosis}</p>
+                    <p><strong>Treatment Plan:</strong> {record.treatment_plan}</p>
+                    {record.medications_prescribed && <p><strong>Medications:</strong> {record.medications_prescribed}</p>}
+                    {record.lab_tests_ordered && (
+                      <p><strong>Lab Tests:</strong> {record.lab_tests_ordered}</p>
+                    )}
+                  </div>
+                  <div>
+                    {record.blood_pressure && <p><strong>Blood Pressure:</strong> {record.blood_pressure}</p>}
+                    {record.heart_rate && <p><strong>Heart Rate:</strong> {record.heart_rate} bpm</p>}
+                    {record.temperature && <p><strong>Temperature:</strong> {record.temperature}°C</p>}
+                    {record.weight && <p><strong>Weight:</strong> {record.weight} kg</p>}
+                    {record.height && <p><strong>Height:</strong> {record.height} cm</p>}
+                    {record.follow_up_instructions && (
+                      <p><strong>Follow-up:</strong> {record.follow_up_instructions}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const renderRecords = () => (
     <div className="space-y-6">
       {/* Message Display */}
@@ -707,6 +776,7 @@ export default function DoctorDashboard() {
                       onClick={() => {
                         loadPatientRecords(patient.id);
                         setSearchQuery(`${patient.first_name} ${patient.last_name}`);
+                        setCurrentView('patient-records');
                       }}
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors mr-2"
                     >
@@ -726,12 +796,20 @@ export default function DoctorDashboard() {
         )}
 
         {/* Medical Records */}
-        {medicalRecords.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Medical History ({medicalRecords.length} visits)
-            </h3>
-            
+        
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Medical History ({medicalRecords.length} visits)
+          </h3>
+          
+          {medicalRecords.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <p className="text-gray-500">No medical records found for this patient.</p>
+              <p className="text-sm text-gray-400 mt-2">
+                Records will appear here once you create a consultation for this patient.
+              </p>
+            </div>
+          ) : (
             <div className="space-y-4">
               {medicalRecords.map((record) => (
                 <div key={record.id} className="border border-gray-200 rounded-lg p-4">
@@ -766,8 +844,8 @@ export default function DoctorDashboard() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1213,6 +1291,7 @@ export default function DoctorDashboard() {
         {currentView === 'queue' && renderQueue()}
         {currentView === 'triage' && renderTriage()}
         {currentView === 'records' && renderRecords()}
+        {currentView === 'patient-records' && renderPatientRecords()}
         {currentView === 'lab-tests' && renderLabTests()}
         {currentView === 'notifications' && renderNotifications()}
         {currentView === 'referrals' && renderReferrals()}

@@ -17,6 +17,23 @@ def create_app(config_name='default'):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+    
+    # Add additional claims to JWT
+    @jwt.additional_claims_loader
+    def add_claims_to_access_token(identity):
+        from app.models.user import User
+        user = User.query.get(int(identity))
+        if user:
+            claims = {
+                'user_id': user.id,
+                'role': user.role,
+                'organization_id': user.organization_id,
+                'organization_code': user.organization.code if user.organization else None,
+                'organization_name': user.organization.name if user.organization else None
+            }
+            return claims
+        return {}
+    
     # Initialize CORS with explicit configuration
     CORS(app, resources={
         r"/api/*": {

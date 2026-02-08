@@ -20,7 +20,7 @@ def get_lab_tests():
         if not user or user.role != 'lab_technician':
             return jsonify({'error': 'Unauthorized'}), 403
         
-        user_org_id = OrganizationScopedQuery.get_current_org_id()
+        user_org_id = user.organization_id
         if not user_org_id:
             return jsonify({'error': 'User not associated with any organization'}), 400
         
@@ -32,11 +32,18 @@ def get_lab_tests():
             Patient.organization_id == user_org_id
         )
         
-        # Apply status filter if provided
+        # Apply status filter if provided - handle comma-separated values
         if status:
-            query = query.filter(LabTest.status == status)
+            # Split comma-separated statuses and filter
+            status_list = [s.strip() for s in status.split(',')]
+            query = query.filter(LabTest.status.in_(status_list))
         
         lab_tests = query.order_by(LabTest.created_at.desc()).all()
+        
+        # Debug logging
+        print(f"DEBUG: Lab technician org {user_org_id} - Found {len(lab_tests)} lab tests")
+        for test in lab_tests:
+            print(f"  Test {test.id}: {test.test_name}, Status: {test.status}, Patient: {test.patient.first_name} {test.patient.last_name}")
         
         # Format the response with patient and doctor information
         tests_data = []
@@ -86,7 +93,7 @@ def get_lab_tests():
 
 @lab_technician_bp.route('/lab_tests/<int:test_id>/status', methods=['PUT'])
 @jwt_required()
-def update_test_status():
+def update_test_status(test_id):
     """Update the status of a lab test"""
     try:
         current_user_id = get_jwt_identity()
@@ -95,22 +102,22 @@ def update_test_status():
         if not user or user.role != 'lab_technician':
             return jsonify({'error': 'Unauthorized'}), 403
         
-        test_id = request.view_args['test_id']
         data = request.get_json()
         new_status = data.get('status')
         
-        if not new_status or new_status not in ['pending', 'in_progress', 'completed']:
-            return jsonify({'error': 'Valid status is required (pending, in_progress, completed)'}), 400
+        # Debug logging
+        print(f"DEBUG: Received status update request for test {test_id} with status: {new_status}")
         
-        # Map frontend status to backend enum
-        status_mapping = {
-            'pending': 'ordered',
-            'in_progress': 'in_progress', 
-            'completed': 'completed'
-        }
-        backend_status = status_mapping.get(new_status, new_status)
+        # Valid statuses from LabTest model enum
+        valid_statuses = ['ordered', 'sample_collected', 'in_progress', 'completed', 'cancelled', 'rejected']
+        if not new_status or new_status not in valid_statuses:
+            print(f"DEBUG: Invalid status received: {new_status}, valid: {valid_statuses}")
+            return jsonify({'error': f'Valid status is required. Allowed values: {valid_statuses}'}), 400
         
-        user_org_id = OrganizationScopedQuery.get_current_org_id()
+        # No status mapping needed - use the status as-is
+        backend_status = new_status
+        
+        user_org_id = user.organization_id
         if not user_org_id:
             return jsonify({'error': 'User not associated with any organization'}), 400
         
@@ -125,7 +132,14 @@ def update_test_status():
         
         # Update status and timestamp
         lab_test.status = backend_status
-        if backend_status == 'completed':
+        
+        # Set appropriate timestamps based on status
+        if backend_status == 'sample_collected':
+            lab_test.sample_collected_at = datetime.utcnow()
+        elif backend_status == 'in_progress':
+            if not lab_test.sample_collected_at:
+                lab_test.sample_collected_at = datetime.utcnow()
+        elif backend_status == 'completed':
             lab_test.completed_at = datetime.utcnow()
         
         db.session.commit()
@@ -145,7 +159,7 @@ def update_test_status():
 
 @lab_technician_bp.route('/lab_tests/<int:test_id>/results', methods=['PUT'])
 @jwt_required()
-def submit_test_results():
+def submit_test_results(test_id):
     """Submit results for a lab test"""
     try:
         current_user_id = get_jwt_identity()
@@ -154,14 +168,13 @@ def submit_test_results():
         if not user or user.role != 'lab_technician':
             return jsonify({'error': 'Unauthorized'}), 403
         
-        test_id = request.view_args['test_id']
         data = request.get_json()
         results = data.get('results')
         
         if not results:
             return jsonify({'error': 'Results are required'}), 400
         
-        user_org_id = OrganizationScopedQuery.get_current_org_id()
+        user_org_id = user.organization_id
         if not user_org_id:
             return jsonify({'error': 'User not associated with any organization'}), 400
         
@@ -225,7 +238,7 @@ def submit_test_results():
 
 @lab_technician_bp.route('/lab_tests/<int:test_id>', methods=['GET'])
 @jwt_required()
-def get_lab_test_details():
+def get_lab_test_details(test_id):
     """Get detailed information about a specific lab test"""
     try:
         current_user_id = get_jwt_identity()
@@ -234,8 +247,7 @@ def get_lab_test_details():
         if not user or user.role != 'lab_technician':
             return jsonify({'error': 'Unauthorized'}), 403
         
-        test_id = request.view_args['test_id']
-        user_org_id = OrganizationScopedQuery.get_current_org_id()
+        user_org_id = user.organization_id
         
         if not user_org_id:
             return jsonify({'error': 'User not associated with any organization'}), 400

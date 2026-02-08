@@ -175,6 +175,10 @@ def complete_triage(patient_id):
         queue_mgmt = QueueManagement.get_or_create_today(user.organization_id)
         queue_number = queue_mgmt.get_next_queue_number()
         
+        # Set queue number and status on triage
+        triage.queue_number = queue_number
+        triage.queue_status = 'waiting'
+        
         # Update patient with queue number and status
         patient.current_queue_number = queue_number
         patient.registration_status = 'triaged'

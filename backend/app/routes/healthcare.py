@@ -15,11 +15,13 @@ from app.utils.data_isolation import (
     organization_required,
     organization_access_required
 )
-from app.models import Patient, Appointment, MedicalRecord, Department, LabTest, Referral
+from app.models import Patient, Appointment, MedicalRecord, Department, LabTest, Referral, Triage
+from app.models.user import User
+from app import db
 from datetime import datetime, date
 import traceback
 
-bp = Blueprint('healthcare', __name__, url_prefix='/api')
+bp = Blueprint('healthcare', __name__, url_prefix='/api/healthcare')
 
 # Patient routes
 @bp.route('/patients', methods=['GET'])
@@ -193,7 +195,21 @@ def create_appointment():
 def get_patient_medical_records(patient_id):
     """Get medical records for a specific patient (organization-scoped)"""
     try:
-        records = medical_record_service.get_patient_records(patient_id)
+        current_user_id = get_jwt_identity()
+        claims = get_jwt()
+        org_id = claims.get('organization_id')
+        
+        print(f"DEBUG: Getting medical records for patient {patient_id}, user {current_user_id}, org {org_id}")
+        
+        # Get records with organization filtering
+        records = MedicalRecord.query.filter(
+            MedicalRecord.patient_id == patient_id,
+            MedicalRecord.organization_id == org_id
+        ).all()
+        
+        print(f"DEBUG: Found {len(records)} medical records")
+        for record in records:
+            print(f"  - Record ID: {record.id}, Date: {record.visit_date}, Diagnosis: {record.diagnosis}")
         
         return jsonify({
             'medical_records': [{
@@ -204,6 +220,9 @@ def get_patient_medical_records(patient_id):
                 'diagnosis': r.diagnosis,
                 'treatment_plan': r.treatment_plan,
                 'medications_prescribed': r.medications_prescribed,
+                'lab_tests_ordered': r.lab_tests_ordered if hasattr(r, 'lab_tests_ordered') else None,
+                'follow_up_instructions': r.follow_up_instructions if hasattr(r, 'follow_up_instructions') else None,
+                'follow_up_date': r.follow_up_date.isoformat() if hasattr(r, 'follow_up_date') and r.follow_up_date else None,
                 'blood_pressure': r.blood_pressure,
                 'heart_rate': r.heart_rate,
                 'temperature': r.temperature,
@@ -213,6 +232,7 @@ def get_patient_medical_records(patient_id):
             'total': len(records)
         })
     except Exception as e:
+        print(f"ERROR getting medical records: {e}")
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/medical-records', methods=['POST'])
@@ -226,27 +246,54 @@ def create_medical_record():
         current_user_id = claims.get('user_id')
         org_id = claims.get('organization_id')
         
+        # Debug logging
+        print(f"DEBUG: Creating medical record - User: {current_user_id}, Org: {org_id}")
+        print(f"DEBUG: Request data keys: {list(data.keys()) if data else 'No data'}")
+        print(f"DEBUG: Full request data: {data}")
+        
         # Convert visit_date string to datetime object if provided
         if 'visit_date' in data and data['visit_date']:
             data['visit_date'] = datetime.fromisoformat(data['visit_date'].replace('Z', '+00:00'))
         else:
             data['visit_date'] = datetime.utcnow()
         
-        # Ensure organization and doctor are set
-        data['organization_id'] = org_id
-        data['doctor_id'] = current_user_id
+        # Extract lab test ID for separate processing
+        lab_test_id = data.pop('lab_test_id', None)
         
-        record = medical_record_service.create(data)
+        # Define valid MedicalRecord fields
+        valid_fields = {
+            'patient_id', 'chief_complaint', 'diagnosis', 'treatment_plan',
+            'medications_prescribed', 'lab_tests_ordered', 'follow_up_instructions',
+            'blood_pressure', 'heart_rate', 'temperature', 'weight', 'height',
+            'visit_type', 'appointment_id'
+        }
+        
+        # Filter data to only include valid MedicalRecord fields
+        filtered_data = {k: v for k, v in data.items() if k in valid_fields}
+        
+        # Ensure organization and doctor are set
+        filtered_data['organization_id'] = org_id
+        filtered_data['doctor_id'] = current_user_id
+        
+        print(f"DEBUG: Filtered data for MedicalRecord: {filtered_data}")
+        
+        record = medical_record_service.create(filtered_data)
         
         # If this medical record is linked to a lab test, update the lab test status
-        if data.get('lab_test_id'):
+        if lab_test_id:
             try:
-                lab_test = lab_test_service.get_by_id(data['lab_test_id'])
+                lab_test = lab_test_service.get_by_id(lab_test_id)
                 if lab_test and lab_test.organization_id == org_id:
                     lab_test.status = 'completed'
                     lab_test_service.update(lab_test)
+                    print(f"DEBUG: Updated lab test {lab_test_id} status to completed")
             except Exception as e:
                 print(f"Warning: Could not update lab test status: {e}")
+        
+        # Handle referral data separately if needed
+        referral_data = {k: v for k, v in data.items() if k.startswith('referral_')}
+        if referral_data.get('referral_type') and referral_data.get('referral_type') != 'none':
+            print(f"DEBUG: Referral data received (not implemented yet): {referral_data}")
         
         # Handle referral creation if referral_type is not 'none'
         referral_id = None
@@ -437,7 +484,9 @@ def get_lab_tests():
                 'units': test.units,
                 'abnormal_flag': test.abnormal_flag,
                 'result_notes': test.result_notes,
-                'lab_location': test.lab_location
+                'lab_location': test.lab_location,
+                'patient_name': f"{test.patient.first_name} {test.patient.last_name}" if test.patient else None,
+                'doctor_name': f"Dr. {test.doctor.first_name} {test.doctor.last_name}" if test.doctor else None
             } for test in lab_tests],
             'total': len(lab_tests)
         })
@@ -798,3 +847,157 @@ def cancel_prescription(prescription_id):
     db.session.commit()
     
     return jsonify({'message': 'Prescription cancelled successfully'}), 200
+
+# Doctor Queue endpoints
+@bp.route('/doctor/queue', methods=['GET'])
+@jwt_required()
+@organization_required
+def get_doctor_queue():
+    """Get queue status for doctors with comprehensive stats"""
+    try:
+        claims = get_jwt()
+        org_id = claims.get('organization_id')
+        today = date.today()
+        
+        # Get all triage records for today (filter by arrival_time date)
+        today_start = datetime.combine(today, datetime.min.time())
+        today_end = datetime.combine(today, datetime.max.time())
+        
+        triages = Triage.query.filter(
+            Triage.organization_id == org_id,
+            Triage.arrival_time >= today_start,
+            Triage.arrival_time <= today_end
+        ).all()
+        
+        # Debug logging
+        print(f"DEBUG: Found {len(triages)} triage records for today")
+        for t in triages:
+            print(f"  - Triage ID: {t.id}, Patient: {t.patient_id}, Status: {t.queue_status}, Level: {t.triage_level}")
+        
+        # Calculate queue statistics
+        total_today = len(triages)
+        emergency_count = len([t for t in triages if t.triage_level == 'emergency'])
+        urgent_count = len([t for t in triages if t.triage_level == 'urgent'])
+        routine_count = len([t for t in triages if t.triage_level not in ['emergency', 'urgent']])
+        
+        # Count by status
+        waiting_count = len([t for t in triages if t.queue_status == 'waiting'])
+        in_progress_count = len([t for t in triages if t.queue_status == 'in_progress'])
+        completed_count = len([t for t in triages if t.queue_status == 'completed'])
+        
+        # Calculate average wait time for waiting patients
+        waiting_triages = [t for t in triages if t.queue_status == 'waiting']
+        avg_wait_time = 0
+        if waiting_triages:
+            total_wait = sum([(datetime.utcnow() - t.created_at).total_seconds() / 60 for t in waiting_triages])
+            avg_wait_time = int(total_wait / len(waiting_triages))
+        
+        # Get current queue number
+        current_number = max([t.queue_number for t in triages]) if triages else 0
+        
+        # Format waiting patients
+        waiting_patients = []
+        for triage in sorted([t for t in triages if t.queue_status == 'waiting'], 
+                           key=lambda x: (x.priority_score, x.created_at)):
+            patient = triage.patient
+            if patient:
+                wait_minutes = int((datetime.utcnow() - triage.created_at).total_seconds() / 60)
+                waiting_patients.append({
+                    'id': triage.id,
+                    'patient_id': str(patient.id),
+                    'patient_name': f"{patient.first_name} {patient.last_name}",
+                    'queue_number': triage.queue_number,
+                    'triage_level': triage.triage_level,
+                    'chief_complaint': triage.chief_complaint,
+                    'arrival_time': triage.created_at.isoformat(),
+                    'wait_time_minutes': wait_minutes,
+                    'priority_score': triage.priority_score
+                })
+        
+        return jsonify({
+            'queue_management': {
+                'current_number': current_number,
+                'total_today': total_today,
+                'average_wait_time': avg_wait_time,
+                'emergency_count': emergency_count,
+                'urgent_count': urgent_count,
+                'routine_count': routine_count
+            },
+            'queue_counts': {
+                'waiting': waiting_count,
+                'in_progress': in_progress_count,
+                'completed': completed_count
+            },
+            'waiting_patients': waiting_patients
+        })
+    except Exception as e:
+        print(f"Error in get_doctor_queue: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/doctor/patients/search', methods=['GET'])
+@jwt_required()
+@organization_required
+def doctor_search_patients():
+    """Search patients for doctors"""
+    try:
+        query = request.args.get('q', '').strip()
+        if not query:
+            return jsonify({'patients': []}), 200
+        
+        patients = patient_service.search_patients(query)
+        
+        return jsonify({
+            'patients': [{
+                'id': p.id,
+                'patient_id': p.patient_id,
+                'first_name': p.first_name,
+                'last_name': p.last_name,
+                'date_of_birth': p.date_of_birth.isoformat() if p.date_of_birth else None,
+                'gender': p.gender,
+                'phone': p.phone,
+                'email': p.email,
+                'blood_type': p.blood_type,
+                'is_active': p.is_active
+            } for p in patients]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/doctor/queue/update-status/<int:triage_id>', methods=['PUT'])
+@jwt_required()
+@organization_required
+def update_queue_status(triage_id):
+    """Update the status of a patient in the queue"""
+    try:
+        data = request.get_json()
+        new_status = data.get('queue_status')
+        
+        if not new_status:
+            return jsonify({'error': 'queue_status is required'}), 400
+        
+        # Get the triage record
+        org_id = get_jwt().get('organization_id')
+        triage = Triage.query.filter_by(
+            id=triage_id,
+            organization_id=org_id
+        ).first()
+        
+        if not triage:
+            return jsonify({'error': 'Triage record not found'}), 404
+        
+        # Update the status
+        triage.queue_status = new_status
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Queue status updated successfully',
+            'triage': {
+                'id': triage.id,
+                'queue_status': triage.queue_status
+            }
+        })
+    except Exception as e:
+        print(f"Error updating queue status: {str(e)}")
+        return jsonify({'error': str(e)}), 500

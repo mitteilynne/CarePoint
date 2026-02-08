@@ -54,7 +54,7 @@ def get_notifications():
 
 @notifications_bp.route('/<int:notification_id>/read', methods=['PUT'])
 @jwt_required()
-def mark_notification_read():
+def mark_notification_read(notification_id):
     """Mark a notification as read"""
     try:
         current_user_id = get_jwt_identity()
@@ -63,7 +63,6 @@ def mark_notification_read():
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
-        notification_id = request.view_args['notification_id']
         user_org_id = OrganizationScopedQuery.get_current_org_id()
         
         if not user_org_id:
@@ -190,10 +189,18 @@ def get_lab_result_notifications():
                     'id': lab_test.id,
                     'test_name': lab_test.test_name,
                     'test_type': lab_test.test_type,
+                    'status': lab_test.status,
                     'result_value': lab_test.result_value,
                     'result_notes': lab_test.result_notes,
                     'abnormal_flag': lab_test.abnormal_flag,
+                    'reference_range': lab_test.reference_range,
+                    'unit': lab_test.units if hasattr(lab_test, 'units') else None,
+                    'units': lab_test.units if hasattr(lab_test, 'units') else None,
+                    'is_abnormal': lab_test.abnormal_flag and lab_test.abnormal_flag != 'normal',
+                    'notes': lab_test.result_notes,
                     'completed_at': lab_test.completed_at.isoformat() if lab_test.completed_at else None,
+                    'patient_name': f"{patient.first_name} {patient.last_name}" if patient else None,
+                    'patient_id': patient.id if patient else None,
                     'patient': {
                         'id': patient.id,
                         'first_name': patient.first_name,
