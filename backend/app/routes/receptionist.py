@@ -614,8 +614,50 @@ def get_queue():
             'assigned_doctor': None  # This would be populated if we had doctor assignment logic
         })
     
+    # Calculate queue statistics
+    total_waiting = len([item for item in queue_items if item['status'] == 'waiting'])
+    total_in_progress = len([item for item in queue_items if item['status'] == 'in_consultation'])
+    
+    # Get today's completed count
+    completed_today = Patient.query.filter(
+        Patient.organization_id == user.organization_id,
+        Patient.registration_date == today,
+        Patient.registration_status == 'completed'
+    ).count()
+    
+    # Calculate average wait time (in minutes)
+    wait_times = [item['wait_time_minutes'] for item in queue_items if item['status'] == 'waiting']
+    avg_wait_time = sum(wait_times) // len(wait_times) if wait_times else 0
+    
+    # Count by priority
+    emergency_count = len([item for item in queue_items if item['triage_level'] == 'emergency'])
+    urgent_count = len([item for item in queue_items if item['triage_level'] == 'urgent'])
+    routine_count = len([item for item in queue_items if item['triage_level'] in ['less_urgent', 'non_urgent']])
+    
+    # Get current queue number
+    highest_queue_num = max([item['queue_number'] for item in queue_items] or [0])
+    
+    # Total registrations today
+    total_today = Patient.query.filter(
+        Patient.organization_id == user.organization_id,
+        Patient.registration_date == today
+    ).count()
+    
     return jsonify({
-        'queue': queue_items
+        'queue_management': {
+            'current_number': highest_queue_num,
+            'total_today': total_today,
+            'average_wait_time': avg_wait_time,
+            'emergency_count': emergency_count,
+            'urgent_count': urgent_count,
+            'routine_count': routine_count
+        },
+        'queue_counts': {
+            'waiting': total_waiting,
+            'in_progress': total_in_progress,
+            'completed': completed_today
+        },
+        'waiting_patients': queue_items
     }), 200
 
 

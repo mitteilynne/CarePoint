@@ -271,22 +271,22 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
       )}
 
       {/* Quick Stats */}
-      {queueStatus && (
+      {queueStatus && queueStatus.queue_counts && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <div className="text-2xl font-bold text-blue-600">{queueStatus.queue_counts.waiting}</div>
+            <div className="text-2xl font-bold text-blue-600">{queueStatus.queue_counts.waiting || 0}</div>
             <div className="text-sm text-blue-800">Patients Waiting</div>
           </div>
           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-            <div className="text-2xl font-bold text-yellow-600">{queueStatus.queue_counts.in_progress}</div>
+            <div className="text-2xl font-bold text-yellow-600">{queueStatus.queue_counts.in_progress || 0}</div>
             <div className="text-sm text-yellow-800">In Consultation</div>
           </div>
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <div className="text-2xl font-bold text-green-600">{queueStatus.queue_counts.completed}</div>
+            <div className="text-2xl font-bold text-green-600">{queueStatus.queue_counts.completed || 0}</div>
             <div className="text-sm text-green-800">Completed Today</div>
           </div>
           <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <div className="text-2xl font-bold text-purple-600">{queueStatus.queue_management.average_wait_time}min</div>
+            <div className="text-2xl font-bold text-purple-600">{queueStatus.queue_management?.average_wait_time || 0}min</div>
             <div className="text-sm text-purple-800">Average Wait</div>
           </div>
         </div>
@@ -364,7 +364,7 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
       </div>
 
       {/* Priority Patients Alert */}
-      {queueStatus && queueStatus.waiting_patients.filter(p => p.triage_level === 'emergency' || p.triage_level === 'urgent').length > 0 && (
+      {queueStatus && queueStatus.waiting_patients && queueStatus.waiting_patients.filter(p => p.triage_level === 'emergency' || p.triage_level === 'urgent').length > 0 && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg">
           <div className="flex">
             <svg className="w-5 h-5 text-red-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
@@ -373,7 +373,7 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
             <div>
               <h3 className="text-lg font-medium text-red-800">Priority Patients Waiting</h3>
               <div className="mt-2 text-sm text-red-700">
-                {queueStatus.waiting_patients
+                {(queueStatus.waiting_patients || [])
                   .filter(p => p.triage_level === 'emergency' || p.triage_level === 'urgent')
                   .map(patient => (
                     <div key={patient.id} className="mb-1">
@@ -393,11 +393,11 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
       )}
 
       {/* Waiting Patients List */}
-      {queueStatus && queueStatus.waiting_patients.length > 0 && (
+      {queueStatus && queueStatus.waiting_patients && queueStatus.waiting_patients.length > 0 && (
         <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Patients in Queue ({queueStatus.waiting_patients.length})</h3>
+          <h3 className="text-lg font-semibold mb-4">Patients in Queue ({queueStatus.waiting_patients?.length || 0})</h3>
           <div className="space-y-3">
-            {queueStatus.waiting_patients.slice(0, 5).map((patient) => (
+            {(queueStatus.waiting_patients || []).slice(0, 5).map((patient) => (
               <div
                 key={patient.id}
                 className={`border-l-4 p-3 rounded-r-lg ${getTreatmentPriorityColor(patient.triage_level)} border`}
@@ -454,7 +454,7 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
         </div>
       </div>
 
-      {queueStatus && queueStatus.waiting_patients.length === 0 ? (
+      {queueStatus && (!queueStatus.waiting_patients || queueStatus.waiting_patients.length === 0) ? (
         <div className="text-center py-8 text-gray-500 bg-white rounded-lg">
           <p>No patients in queue</p>
         </div>

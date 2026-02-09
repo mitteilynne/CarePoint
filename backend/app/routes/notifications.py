@@ -162,19 +162,28 @@ def get_lab_result_notifications():
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         
-        if not user or user.role != 'doctor':
-            return jsonify({'error': 'Access denied. Doctor role required'}), 403
+        if not user or user.role not in ['doctor', 'admin']:
+            return jsonify({'error': 'Access denied. Doctor or Admin role required'}), 403
         
         user_org_id = OrganizationScopedQuery.get_current_org_id()
         if not user_org_id:
             return jsonify({'error': 'User not associated with any organization'}), 400
         
         # Get lab result notifications with test details
-        notifications = Notification.query.filter(
-            Notification.organization_id == user_org_id,
-            Notification.recipient_id == current_user_id,
-            Notification.notification_type == 'lab_result'
-        ).order_by(Notification.created_at.desc()).all()
+        # For doctors, get notifications assigned to them
+        # For admins, get recent lab results for the organization
+        if user.role == 'doctor':
+            notifications = Notification.query.filter(
+                Notification.organization_id == user_org_id,
+                Notification.recipient_id == current_user_id,
+                Notification.notification_type == 'lab_result'
+            ).order_by(Notification.created_at.desc()).all()
+        else:  # admin role
+            # Get recent lab result notifications for the organization
+            notifications = Notification.query.filter(
+                Notification.organization_id == user_org_id,
+                Notification.notification_type == 'lab_result'
+            ).order_by(Notification.created_at.desc()).limit(20).all()
         
         result_data = []
         for notification in notifications:
