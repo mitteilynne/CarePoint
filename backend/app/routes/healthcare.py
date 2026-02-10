@@ -888,8 +888,8 @@ def create_prescription():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'doctor':
-        return jsonify({'error': 'Only doctors can create prescriptions'}), 403
+    if not user or user.role not in ['doctor', 'admin']:
+        return jsonify({'error': 'Only doctors and admins can create prescriptions'}), 403
     
     organization_id = user.organization_id
     if not organization_id:
@@ -971,8 +971,8 @@ def update_prescription(prescription_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'doctor':
-        return jsonify({'error': 'Only doctors can update prescriptions'}), 403
+    if not user or user.role not in ['doctor', 'admin']:
+        return jsonify({'error': 'Only doctors and admins can update prescriptions'}), 403
     
     organization_id = user.organization_id
     
@@ -1013,8 +1013,8 @@ def cancel_prescription(prescription_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'doctor':
-        return jsonify({'error': 'Only doctors can cancel prescriptions'}), 403
+    if not user or user.role not in ['doctor', 'admin']:
+        return jsonify({'error': 'Only doctors and admins can cancel prescriptions'}), 403
     
     organization_id = user.organization_id
     

@@ -17,7 +17,7 @@ def get_lab_tests():
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         
-        if not user or user.role != 'lab_technician':
+        if not user or user.role not in ['lab_technician', 'admin']:
             return jsonify({'error': 'Unauthorized'}), 403
         
         user_org_id = user.organization_id
@@ -99,7 +99,7 @@ def update_test_status(test_id):
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         
-        if not user or user.role != 'lab_technician':
+        if not user or user.role not in ['lab_technician', 'admin']:
             return jsonify({'error': 'Unauthorized'}), 403
         
         data = request.get_json()
@@ -165,7 +165,7 @@ def submit_test_results(test_id):
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         
-        if not user or user.role != 'lab_technician':
+        if not user or user.role not in ['lab_technician', 'admin']:
             return jsonify({'error': 'Unauthorized'}), 403
         
         data = request.get_json()
@@ -244,7 +244,7 @@ def get_lab_test_details(test_id):
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         
-        if not user or user.role != 'lab_technician':
+        if not user or user.role not in ['lab_technician', 'admin']:
             return jsonify({'error': 'Unauthorized'}), 403
         
         user_org_id = user.organization_id
@@ -310,7 +310,7 @@ def get_lab_stats():
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         
-        if not user or user.role != 'lab_technician':
+        if not user or user.role not in ['lab_technician', 'admin']:
             return jsonify({'error': 'Unauthorized'}), 403
         
         user_org_id = OrganizationScopedQuery.get_current_org_id()

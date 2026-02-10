@@ -553,6 +553,58 @@ def update_queue_status(queue_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/queue/update-status/<int:triage_id>', methods=['PUT'])
+@jwt_required()
+@role_required(['receptionist', 'admin', 'doctor', 'nurse'])
+def update_patient_queue_status(triage_id):
+    """Update patient status in the queue (for use in doctor module)"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+    
+    data = request.get_json()
+    queue_status = data.get('queue_status')
+    
+    if not queue_status:
+        return jsonify({'error': 'queue_status is required'}), 400
+    
+    try:
+        # Find the patient by triage ID (the patient id is passed as triage_id from frontend)
+        patient = Patient.query.filter_by(
+            id=triage_id,
+            organization_id=user.organization_id
+        ).first()
+        
+        if not patient:
+            return jsonify({'error': 'Patient not found'}), 404
+        
+        # Map queue_status to registration_status
+        status_mapping = {
+            'in_progress': 'in_consultation',
+            'in_consultation': 'in_consultation',
+            'completed': 'completed',
+            'waiting': 'waiting'
+        }
+        
+        new_status = status_mapping.get(queue_status, queue_status)
+        patient.registration_status = new_status
+        patient.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Patient status updated successfully',
+            'patient_id': patient.id,
+            'new_status': patient.registration_status
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to update patient status: {str(e)}'}), 500
+
+
 @bp.route('/queue', methods=['GET'])
 @jwt_required()
 @role_required(['receptionist', 'admin', 'doctor', 'nurse'])
