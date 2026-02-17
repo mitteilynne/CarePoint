@@ -7,11 +7,14 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from functools import wraps
 from app import db
-from app.models import User, Organization
+from app.models import User, Organization, FacilityRegistrationRequest
 from app.models.healthcare import Patient, MedicalRecord, LabTest
 from sqlalchemy import func, and_, or_
 from datetime import datetime, timedelta
 import logging
+import uuid
+import random
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -489,3 +492,178 @@ def get_recent_activity():
     except Exception as e:
         logger.error(f"Error getting recent activity: {str(e)}")
         return jsonify({'error': 'Failed to get recent activity'}), 500
+
+
+@bp.route('/facility-requests', methods=['GET'])
+@require_super_admin
+def get_facility_requests():
+    """Get all facility registration requests"""
+    try:
+        status_filter = request.args.get('status', 'all')
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        query = FacilityRegistrationRequest.query
+        
+        if status_filter != 'all':
+            query = query.filter_by(status=status_filter)
+        
+        requests_paginated = query.order_by(
+            FacilityRegistrationRequest.created_at.desc()
+        ).paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Get counts for each status
+        pending_count = FacilityRegistrationRequest.query.filter_by(status='pending').count()
+        approved_count = FacilityRegistrationRequest.query.filter_by(status='approved').count()
+        rejected_count = FacilityRegistrationRequest.query.filter_by(status='rejected').count()
+        
+        return jsonify({
+            'requests': [req.to_dict() for req in requests_paginated.items],
+            'counts': {
+                'pending': pending_count,
+                'approved': approved_count,
+                'rejected': rejected_count,
+                'total': pending_count + approved_count + rejected_count
+            },
+            'pagination': {
+                'page': requests_paginated.page,
+                'per_page': requests_paginated.per_page,
+                'total': requests_paginated.total,
+                'pages': requests_paginated.pages
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting facility requests: {str(e)}")
+        return jsonify({'error': 'Failed to get facility requests'}), 500
+
+
+@bp.route('/facility-requests/<int:request_id>', methods=['GET'])
+@require_super_admin
+def get_facility_request(request_id):
+    """Get a specific facility registration request"""
+    try:
+        facility_request = FacilityRegistrationRequest.query.get(request_id)
+        
+        if not facility_request:
+            return jsonify({'error': 'Request not found'}), 404
+        
+        return jsonify({'request': facility_request.to_dict()}), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting facility request: {str(e)}")
+        return jsonify({'error': 'Failed to get facility request'}), 500
+
+
+def generate_organization_code(facility_name):
+    """Generate a unique organization code"""
+    # Take first 3-4 letters from facility name
+    name_parts = facility_name.upper().split()
+    if len(name_parts) > 1:
+        code_base = ''.join([part[0] for part in name_parts[:3]])
+    else:
+        code_base = facility_name[:4].upper()
+    
+    # Add random numbers
+    while True:
+        code = f"{code_base}{random.randint(100, 999)}"
+        # Check if code already exists
+        if not Organization.query.filter_by(code=code).first():
+            return code
+
+
+@bp.route('/facility-requests/<int:request_id>/approve', methods=['POST'])
+@require_super_admin
+def approve_facility_request(request_id):
+    """Approve a facility registration request and create organization"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        data = request.get_json() or {}
+        
+        facility_request = FacilityRegistrationRequest.query.get(request_id)
+        
+        if not facility_request:
+            return jsonify({'error': 'Request not found'}), 404
+        
+        if facility_request.status != 'pending':
+            return jsonify({'error': f'Request is already {facility_request.status}'}), 400
+        
+        # Generate organization code
+        org_code = data.get('organization_code') or generate_organization_code(facility_request.facility_name)
+        
+        # Create new organization
+        new_org = Organization(
+            code=org_code,
+            name=facility_request.facility_name,
+            organization_type=facility_request.facility_type,
+            address=facility_request.address,
+            phone=facility_request.phone,
+            email=facility_request.email,
+            website=facility_request.website,
+            description=facility_request.description,
+            is_active=True,
+            subscription_plan=data.get('subscription_plan', 'basic'),
+            max_users=data.get('max_users', 50)
+        )
+        
+        db.session.add(new_org)
+        db.session.flush()  # Get the organization ID
+        
+        # Update facility request
+        facility_request.status = 'approved'
+        facility_request.reviewed_by = current_user_id
+        facility_request.reviewed_at = datetime.utcnow()
+        facility_request.admin_notes = data.get('admin_notes', '')
+        facility_request.organization_id = new_org.id
+        
+        db.session.commit()
+        
+        logger.info(f"Facility request approved: {facility_request.facility_name} -> Organization {org_code}")
+        
+        return jsonify({
+            'message': 'Facility registration request approved successfully',
+            'organization': new_org.to_dict(),
+            'request': facility_request.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error approving facility request: {str(e)}")
+        return jsonify({'error': 'Failed to approve facility request'}), 500
+
+
+@bp.route('/facility-requests/<int:request_id>/reject', methods=['POST'])
+@require_super_admin
+def reject_facility_request(request_id):
+    """Reject a facility registration request"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        data = request.get_json() or {}
+        
+        facility_request = FacilityRegistrationRequest.query.get(request_id)
+        
+        if not facility_request:
+            return jsonify({'error': 'Request not found'}), 404
+        
+        if facility_request.status != 'pending':
+            return jsonify({'error': f'Request is already {facility_request.status}'}), 400
+        
+        # Update facility request
+        facility_request.status = 'rejected'
+        facility_request.reviewed_by = current_user_id
+        facility_request.reviewed_at = datetime.utcnow()
+        facility_request.admin_notes = data.get('admin_notes', '')
+        
+        db.session.commit()
+        
+        logger.info(f"Facility request rejected: {facility_request.facility_name}")
+        
+        return jsonify({
+            'message': 'Facility registration request rejected',
+            'request': facility_request.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error rejecting facility request: {str(e)}")
+        return jsonify({'error': 'Failed to reject facility request'}), 500

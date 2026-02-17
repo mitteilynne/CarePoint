@@ -5,7 +5,7 @@ from flask_jwt_extended import (
 )
 from sqlalchemy.exc import IntegrityError
 from app import db
-from app.models import User, Organization, PasswordReset
+from app.models import User, Organization, PasswordReset, FacilityRegistrationRequest
 from datetime import timedelta, datetime
 import logging
 import secrets
@@ -237,3 +237,66 @@ def get_current_user():
     except Exception as e:
         logger.error(f"Get user error: {str(e)}")
         return jsonify({'error': 'Failed to get user information'}), 500
+
+
+@bp.route('/facility-registration', methods=['POST'])
+def facility_registration():
+    """Submit facility registration request"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = [
+            'facility_name', 'facility_type', 'address', 'phone', 'email',
+            'contact_person_name', 'contact_person_email', 'contact_person_phone'
+        ]
+        
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field.replace("_", " ").title()} is required'}), 400
+        
+        # Check if facility already has a pending or approved request
+        existing_request = FacilityRegistrationRequest.query.filter(
+            (FacilityRegistrationRequest.email == data['email'].lower().strip()) |
+            (FacilityRegistrationRequest.facility_name == data['facility_name'].strip())
+        ).filter(
+            FacilityRegistrationRequest.status.in_(['pending', 'approved'])
+        ).first()
+        
+        if existing_request:
+            if existing_request.status == 'approved':
+                return jsonify({'error': 'This facility is already registered'}), 400
+            else:
+                return jsonify({'error': 'A registration request for this facility is already pending'}), 400
+        
+        # Create new facility registration request
+        facility_request = FacilityRegistrationRequest(
+            facility_name=data['facility_name'].strip(),
+            facility_type=data['facility_type'],
+            address=data['address'].strip(),
+            phone=data['phone'].strip(),
+            email=data['email'].lower().strip(),
+            website=data.get('website', '').strip() if data.get('website') else None,
+            contact_person_name=data['contact_person_name'].strip(),
+            contact_person_email=data['contact_person_email'].lower().strip(),
+            contact_person_phone=data['contact_person_phone'].strip(),
+            contact_person_position=data.get('contact_person_position', '').strip() if data.get('contact_person_position') else None,
+            description=data.get('description', '').strip() if data.get('description') else None,
+            number_of_staff=data.get('number_of_staff'),
+            status='pending'
+        )
+        
+        db.session.add(facility_request)
+        db.session.commit()
+        
+        logger.info(f"New facility registration request submitted: {facility_request.facility_name}")
+        
+        return jsonify({
+            'message': 'Facility registration request submitted successfully. Our team will review and contact you soon.',
+            'request': facility_request.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Facility registration error: {str(e)}")
+        return jsonify({'error': 'Failed to submit registration request'}), 500

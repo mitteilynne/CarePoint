@@ -336,7 +336,8 @@ export const getAdminSidebarItems = (counts?: {
 
 export const getSuperAdminSidebarItems = (counts?: { 
   organizations?: number; 
-  totalUsers?: number; 
+  totalUsers?: number;
+  pendingRequests?: number;
 }): SidebarItem[] => [
   {
     key: 'overview',
@@ -350,9 +351,15 @@ export const getSuperAdminSidebarItems = (counts?: {
     count: counts?.organizations
   },
   {
+    key: 'facility_requests',
+    label: 'Facility Requests',
+    icon: PlusCircleIcon,
+    count: counts?.pendingRequests
+  },
+  {
     key: 'create_organization',
     label: 'Create Organization',
-    icon: PlusCircleIcon
+    icon: BuildingOffice2Icon
   }
 ];
 

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import AdminSidebar, { getSuperAdminSidebarItems } from '@/components/AdminSidebar';
 import api from '@/services/api';
 
-type ViewMode = 'overview' | 'organizations' | 'organization_details' | 'create_organization';
+type ViewMode = 'overview' | 'organizations' | 'organization_details' | 'create_organization' | 'facility_requests';
 
 interface OrganizationFormData {
   name: string;
@@ -96,6 +96,17 @@ export default function SuperAdminDashboard() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Facility registration requests
+  const [facilityRequests, setFacilityRequests] = useState<any[]>([]);
+  const [requestsFilter, setRequestsFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [requestsCounts, setRequestsCounts] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+  const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [orgCode, setOrgCode] = useState('');
+  const [processingRequest, setProcessingRequest] = useState(false);
+
   // Fetch platform overview
   const fetchOverview = useCallback(async () => {
     try {
@@ -106,6 +117,10 @@ export default function SuperAdminDashboard() {
       // Also fetch recent organizations for the overview
       const orgsResponse = await api.get('/super-admin/organizations', { params: { per_page: 5 } });
       setRecentOrganizations(orgsResponse.data.organizations || []);
+      
+      // Fetch facility requests counts
+      const requestsResponse = await api.get('/super-admin/facility-requests', { params: { per_page: 1 } });
+      setRequestsCounts(requestsResponse.data.counts);
       
       setError('');
     } catch (err: unknown) {
@@ -232,14 +247,89 @@ export default function SuperAdminDashboard() {
     setViewMode('organization_details');
   };
 
+  // Fetch facility registration requests
+  const fetchFacilityRequests = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params: Record<string, string> = {};
+      if (requestsFilter !== 'all') params.status = requestsFilter;
+
+      const response = await api.get('/super-admin/facility-requests', { params });
+      setFacilityRequests(response.data.requests || []);
+      setRequestsCounts(response.data.counts);
+      setError('');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load facility requests';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, [requestsFilter]);
+
+  // Approve facility request
+  const approveFacilityRequest = async () => {
+    if (!selectedRequest) return;
+    
+    try {
+      setProcessingRequest(true);
+      await api.post(`/super-admin/facility-requests/${selectedRequest.id}/approve`, {
+        admin_notes: adminNotes,
+        organization_code: orgCode || undefined
+      });
+      setSuccessMessage('Facility request approved successfully');
+      setApprovalModalOpen(false);
+      setAdminNotes('');
+      setOrgCode('');
+      setSelectedRequest(null);
+      fetchFacilityRequests();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to approve request';
+      setError(errorMessage);
+    } finally {
+      setProcessingRequest(false);
+    }
+  };
+
+  // Reject facility request
+  const rejectFacilityRequest = async () => {
+    if (!selectedRequest) return;
+    
+    try {
+      setProcessingRequest(true);
+      await api.post(`/super-admin/facility-requests/${selectedRequest.id}/reject`, {
+        admin_notes: adminNotes
+      });
+      setSuccessMessage('Facility request rejected');
+      setRejectionModalOpen(false);
+      setAdminNotes('');
+      setSelectedRequest(null);
+      fetchFacilityRequests();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reject request';
+      setError(errorMessage);
+    } finally {
+      setProcessingRequest(false);
+    }
+  };
+
   // Effects
   useEffect(() => {
     if (viewMode === 'overview') {
       fetchOverview();
     } else if (viewMode === 'organizations') {
       fetchOrganizations();
+    } else if (viewMode === 'facility_requests') {
+      fetchFacilityRequests();
     }
-  }, [viewMode, fetchOverview, fetchOrganizations]);
+  }, [viewMode, fetchOverview, fetchOrganizations, fetchFacilityRequests]);
+
+  useEffect(() => {
+    if (viewMode === 'facility_requests') {
+      fetchFacilityRequests();
+    }
+  }, [requestsFilter, fetchFacilityRequests, viewMode]);
 
   // Handle logout
   const handleLogout = () => {
@@ -257,7 +347,8 @@ export default function SuperAdminDashboard() {
   // Get sidebar items with counts
   const sidebarItems = getSuperAdminSidebarItems({
     organizations: overview?.organizations.total,
-    totalUsers: overview?.users.total
+    totalUsers: overview?.users.total,
+    pendingRequests: requestsCounts.pending
   });
 
   // Render loading state
@@ -295,12 +386,14 @@ export default function SuperAdminDashboard() {
               {viewMode === 'organizations' && 'Organizations Management'}
               {viewMode === 'organization_details' && 'Organization Details'}
               {viewMode === 'create_organization' && 'Create Organization'}
+              {viewMode === 'facility_requests' && 'Facility Registration Requests'}
             </h1>
             <p className="mt-2 text-gray-600">
               {viewMode === 'overview' && 'Monitor and manage the entire healthcare platform'}
               {viewMode === 'organizations' && 'View and manage all organizations on the platform'}
               {viewMode === 'organization_details' && 'Detailed view of selected organization'}
               {viewMode === 'create_organization' && 'Add a new organization to the platform'}
+              {viewMode === 'facility_requests' && 'Review and approve facility registration requests'}
             </p>
           </div>
 
@@ -866,6 +959,254 @@ export default function SuperAdminDashboard() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Facility Requests View */}
+        {viewMode === 'facility_requests' && (
+          <div className="space-y-6">
+            {/* Filter Tabs */}
+            <div className="bg-white rounded-xl shadow-md p-4">
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setRequestsFilter('pending')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    requestsFilter === 'pending'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Pending ({requestsCounts.pending})
+                </button>
+                <button
+                onClick={() => setRequestsFilter('approved')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    requestsFilter === 'approved'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Approved ({requestsCounts.approved})
+                </button>
+                <button
+                  onClick={() => setRequestsFilter('rejected')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    requestsFilter === 'rejected'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Rejected ({requestsCounts.rejected})
+                </button>
+                <button
+                  onClick={() => setRequestsFilter('all')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    requestsFilter === 'all'
+                      ? 'bg-indigo-100 text-indigo-800'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  All ({requestsCounts.total})
+                </button>
+              </div>
+            </div>
+
+            {/* Requests List */}
+            <div className="grid grid-cols-1 gap-6">
+              {facilityRequests.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-md p-12 text-center">
+                  <p className="text-gray-500">No facility registration requests found</p>
+                </div>
+              ) : (
+                facilityRequests.map((request) => (
+                  <div key={request.id} className="bg-white rounded-xl shadow-md p-6">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                          <h3 className="text-xl font-bold text-gray-900">{request.facility_name}</h3>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {request.status.toUpperCase()}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600"><strong>Type:</strong> {request.facility_type}</p>
+                            <p className="text-gray-600"><strong>Email:</strong> {request.email}</p>
+                            <p className="text-gray-600"><strong>Phone:</strong> {request.phone}</p>
+                            <p className="text-gray-600"><strong>Address:</strong> {request.address}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600"><strong>Contact Person:</strong> {request.contact_person_name}</p>
+                            <p className="text-gray-600"><strong>Contact Email:</strong> {request.contact_person_email}</p>
+                            <p className="text-gray-600"><strong>Contact Phone:</strong> {request.contact_person_phone}</p>
+                            {request.contact_person_position && (
+                              <p className="text-gray-600"><strong>Position:</strong> {request.contact_person_position}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {request.description && (
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-600"><strong>Description:</strong></p>
+                            <p className="text-sm text-gray-700 mt-1">{request.description}</p>
+                          </div>
+                        )}
+
+                        {request.admin_notes && (
+                          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-sm text-gray-600"><strong>Admin Notes:</strong></p>
+                            <p className="text-sm text-gray-700 mt-1">{request.admin_notes}</p>
+                          </div>
+                        )}
+
+                        <div className="mt-3 text-xs text-gray-500">
+                          <p>Submitted: {new Date(request.created_at).toLocaleString()}</p>
+                          {request.reviewed_at && (
+                            <p>Reviewed: {new Date(request.reviewed_at).toLocaleString()}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {request.status === 'pending' && (
+                        <div className="flex flex-col gap-2 ml-4">
+                          <button
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              setApprovalModalOpen(true);
+                            }}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              setRejectionModalOpen(true);
+                            }}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Approval Modal */}
+        {approvalModalOpen && selectedRequest && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Approve Facility Request</h3>
+              <p className="text-gray-700 mb-4">
+                Approve <strong>{selectedRequest.facility_name}</strong>?
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Organization Code (Optional - will be auto-generated if empty)
+                  </label>
+                  <input
+                    type="text"
+                    value={orgCode}
+                    onChange={(e) => setOrgCode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    placeholder="Leave empty for auto-generation"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Admin Notes (Optional)
+                  </label>
+                  <textarea
+                    value={adminNotes}
+                    onChange={(e) => setAdminNotes(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    placeholder="Any notes for the facility..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setApprovalModalOpen(false);
+                    setSelectedRequest(null);
+                    setAdminNotes('');
+                    setOrgCode('');
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  disabled={processingRequest}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={approveFacilityRequest}
+                  disabled={processingRequest}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processingRequest ? 'Approving...' : 'Approve'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rejection Modal */}
+        {rejectionModalOpen && selectedRequest && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Reject Facility Request</h3>
+              <p className="text-gray-700 mb-4">
+                Reject <strong>{selectedRequest.facility_name}</strong>?
+              </p>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reason for Rejection (Optional)
+                </label>
+                <textarea
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                  placeholder="Provide feedback to the facility..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setRejectionModalOpen(false);
+                    setSelectedRequest(null);
+                    setAdminNotes('');
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  disabled={processingRequest}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={rejectFacilityRequest}
+                  disabled={processingRequest}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processingRequest ? 'Rejecting...' : 'Reject'}
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -91,6 +91,79 @@ class Organization(db.Model):
         return f'<Organization {self.code}: {self.name}>'
 
 
+class FacilityRegistrationRequest(db.Model):
+    __tablename__ = 'facility_registration_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    facility_name = db.Column(db.String(255), nullable=False)
+    facility_type = db.Column(db.Enum('hospital', 'clinic', 'pharmacy', 'laboratory', 'other',
+                                      name='facility_types'),
+                              nullable=False, default='clinic')
+    address = db.Column(db.Text, nullable=False)
+    phone = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    website = db.Column(db.String(255))
+    
+    # Contact person details
+    contact_person_name = db.Column(db.String(255), nullable=False)
+    contact_person_email = db.Column(db.String(120), nullable=False)
+    contact_person_phone = db.Column(db.String(20), nullable=False)
+    contact_person_position = db.Column(db.String(100))
+    
+    # Additional information
+    description = db.Column(db.Text)
+    number_of_staff = db.Column(db.Integer)
+    
+    # Status tracking
+    status = db.Column(db.Enum('pending', 'approved', 'rejected', name='request_status'),
+                      nullable=False, default='pending')
+    
+    # Admin response
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    admin_notes = db.Column(db.Text)
+    
+    # Created organization (if approved)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow,
+                          onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    reviewer = db.relationship('User', foreign_keys=[reviewed_by], backref='reviewed_requests')
+    organization = db.relationship('Organization', foreign_keys=[organization_id], backref='registration_request')
+
+    def to_dict(self):
+        """Convert request to dictionary"""
+        return {
+            'id': self.id,
+            'facility_name': self.facility_name,
+            'facility_type': self.facility_type,
+            'address': self.address,
+            'phone': self.phone,
+            'email': self.email,
+            'website': self.website,
+            'contact_person_name': self.contact_person_name,
+            'contact_person_email': self.contact_person_email,
+            'contact_person_phone': self.contact_person_phone,
+            'contact_person_position': self.contact_person_position,
+            'description': self.description,
+            'number_of_staff': self.number_of_staff,
+            'status': self.status,
+            'reviewed_by': self.reviewed_by,
+            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None,
+            'admin_notes': self.admin_notes,
+            'organization_id': self.organization_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    def __repr__(self):
+        return f'<FacilityRegistrationRequest {self.facility_name} - {self.status}>'
+
+
 class PasswordReset(db.Model):
     __tablename__ = 'password_resets'
 
