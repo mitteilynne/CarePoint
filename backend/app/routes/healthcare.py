@@ -748,6 +748,33 @@ def create_lab_test():
             'lab_location': data.get('lab_location')
         })
         
+        # Create notifications for all lab technicians in the organization
+        from app.models.healthcare import Notification
+        lab_technicians = User.query.filter_by(
+            organization_id=org_id,
+            role='lab_technician',
+            is_active=True
+        ).all()
+        
+        patient = Patient.query.get(data['patient_id'])
+        doctor = User.query.get(current_user_id)
+        
+        for lab_tech in lab_technicians:
+            notification = Notification(
+                organization_id=org_id,
+                recipient_id=lab_tech.id,
+                sender_id=current_user_id,
+                title=f'New {lab_test.urgency.upper()} Lab Test Request',
+                message=f'Dr. {doctor.first_name} {doctor.last_name} has requested a {lab_test.test_name} for patient {patient.first_name} {patient.last_name} (ID: {patient.patient_id})',
+                notification_type='lab_result',
+                priority='high' if lab_test.urgency in ['stat', 'urgent'] else 'medium',
+                lab_test_id=lab_test.id,
+                patient_id=patient.id
+            )
+            db.session.add(notification)
+        
+        db.session.commit()
+        
         return jsonify({
             'message': 'Lab test ordered successfully',
             'lab_test': {
@@ -760,6 +787,7 @@ def create_lab_test():
             }
         }), 201
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
 @bp.route('/lab-tests/<int:test_id>', methods=['PUT'])
