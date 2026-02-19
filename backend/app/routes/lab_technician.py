@@ -197,6 +197,20 @@ def submit_test_results(test_id):
         
         db.session.commit()
         
+        # ===== BILLING: Add lab test fee to patient's bill =====
+        try:
+            from app.routes.billing import add_lab_test_fee
+            add_lab_test_fee(
+                organization_id=user_org_id,
+                patient_id=lab_test.patient_id,
+                lab_test_id=lab_test.id,
+                test_name=lab_test.test_name
+            )
+            db.session.commit()
+            print(f"DEBUG: Added lab test fee for test {lab_test.test_name} to patient {lab_test.patient_id}'s bill")
+        except Exception as e:
+            print(f"Warning: Could not add lab test billing: {e}")
+        
         # Create notification for the ordering doctor
         patient = lab_test.patient
         doctor = lab_test.doctor

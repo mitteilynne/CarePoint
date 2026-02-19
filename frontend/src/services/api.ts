@@ -254,4 +254,53 @@ export const pharmacistAPI = {
   },
 };
 
+// Billing API
+export const billingAPI = {
+  getBills: async (params?: { status?: string; search?: string; date?: string }) => {
+    const response = await api.get('/billing/bills', { params });
+    return response.data;
+  },
+
+  getBillDetails: async (billId: number) => {
+    const response = await api.get(`/billing/bills/${billId}`);
+    return response.data;
+  },
+
+  getPatientBills: async (patientId: number) => {
+    const response = await api.get(`/billing/bills/patient/${patientId}`);
+    return response.data;
+  },
+
+  processPayment: async (billId: number, data: {
+    amount_paid: number;
+    payment_method: string;
+    payment_reference?: string;
+    payment_notes?: string;
+    discount_amount?: number;
+  }) => {
+    const response = await api.post(`/billing/bills/${billId}/pay`, data);
+    return response.data;
+  },
+
+  applyDiscount: async (billId: number, data: { discount_amount: number }) => {
+    const response = await api.post(`/billing/bills/${billId}/discount`, data);
+    return response.data;
+  },
+
+  cancelBill: async (billId: number) => {
+    const response = await api.post(`/billing/bills/${billId}/cancel`);
+    return response.data;
+  },
+
+  getPendingBills: async () => {
+    const response = await api.get('/billing/pending');
+    return response.data;
+  },
+
+  getStats: async () => {
+    const response = await api.get('/billing/stats');
+    return response.data;
+  },
+};
+
 export default api;

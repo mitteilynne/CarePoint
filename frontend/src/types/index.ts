@@ -253,6 +253,55 @@ export interface ApiError {
   error: string;
 }
 
+// Billing Types
+export interface BillItem {
+  id: number;
+  bill_id: number;
+  item_type: 'consultation' | 'lab_test' | 'medication' | 'procedure' | 'other';
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  lab_test_id?: number;
+  prescription_id?: number;
+  appointment_id?: number;
+  medical_record_id?: number;
+  created_at: string;
+}
+
+export interface Bill {
+  id: number;
+  bill_number: string;
+  patient_id: number;
+  patient_name: string;
+  patient_identifier: string;
+  total_amount: number;
+  paid_amount: number;
+  discount_amount: number;
+  balance_due: number;
+  status: 'open' | 'pending_payment' | 'partially_paid' | 'paid' | 'cancelled';
+  payment_method?: 'cash' | 'card' | 'insurance' | 'mobile_money' | 'bank_transfer' | 'other';
+  payment_reference?: string;
+  payment_notes?: string;
+  visit_date: string;
+  items: BillItem[];
+  item_count: number;
+  created_by?: string;
+  paid_to?: string;
+  created_at: string;
+  updated_at: string;
+  paid_at?: string;
+}
+
+export interface BillingStats {
+  pending_payments: number;
+  today_collections: number;
+  today_total_billed: number;
+  outstanding_amount: number;
+  today_bills: number;
+  paid_today: number;
+}
+
 export interface Notification {
   id: number;
   title: string;

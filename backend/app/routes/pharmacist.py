@@ -135,6 +135,27 @@ def dispense_prescription(prescription_id):
     
     db.session.commit()
     
+    # ===== BILLING: Add medication fee to patient's bill =====
+    try:
+        from app.routes.billing import add_medication_fee
+        
+        # Get unit price from inventory item if available
+        unit_price = float(inventory_item.unit_price) if inventory_item and inventory_item.unit_price else 0
+        
+        if unit_price > 0:
+            add_medication_fee(
+                organization_id=organization_id,
+                patient_id=prescription.patient_id,
+                prescription_id=prescription.id,
+                medication_name=prescription.medication_name,
+                quantity=quantity_dispensed,
+                unit_price=unit_price
+            )
+            db.session.commit()
+            print(f"DEBUG: Added medication fee for {prescription.medication_name} (qty: {quantity_dispensed}, price: {unit_price}) to patient {prescription.patient_id}'s bill")
+    except Exception as e:
+        print(f"Warning: Could not add medication billing: {e}")
+    
     return jsonify({
         'message': 'Prescription dispensed successfully',
         'prescription': prescription.to_dict()

@@ -557,6 +557,42 @@ def create_medical_record():
             response_data['referral_created'] = True
             response_data['referral_id'] = referral_id
         
+        # ===== BILLING: Add consultation fee and finalize bill =====
+        try:
+            from app.routes.billing import add_consultation_fee, finalize_bill
+            
+            # Get consultation fee from appointment if available
+            appointment_id = filtered_data.get('appointment_id')
+            fee_amount = None
+            if appointment_id:
+                appointment = Appointment.query.get(appointment_id)
+                if appointment and appointment.consultation_fee:
+                    fee_amount = float(appointment.consultation_fee)
+            
+            # Add consultation fee to the bill
+            bill = add_consultation_fee(
+                organization_id=org_id,
+                patient_id=data['patient_id'],
+                doctor_id=current_user_id,
+                medical_record_id=record.id,
+                appointment_id=appointment_id,
+                fee_amount=fee_amount
+            )
+            
+            # Finalize the bill (set to pending_payment, notify receptionists)
+            finalize_bill(org_id, data['patient_id'])
+            
+            db.session.commit()
+            
+            response_data['bill_id'] = bill.id
+            response_data['bill_number'] = bill.bill_number
+            print(f"DEBUG: Added consultation fee to bill {bill.bill_number}")
+        except Exception as e:
+            print(f"Warning: Could not add billing info: {e}")
+            # Don't fail the medical record creation if billing fails
+            import traceback
+            traceback.print_exc()
+        
         return jsonify(response_data), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -1276,6 +1312,27 @@ def update_queue_status(triage_id):
         
         # Update the status
         triage.queue_status = new_status
+        
+        # Update patient registration status
+        patient = Patient.query.get(triage.patient_id)
+        if patient and new_status == 'completed':
+            patient.registration_status = 'completed'
+            patient.updated_at = datetime.utcnow()
+            
+            # ===== BILLING: Finalize bill when consultation is completed =====
+            try:
+                from app.routes.billing import finalize_bill, get_or_create_bill
+                
+                # Ensure a bill exists before finalizing
+                get_or_create_bill(org_id, patient.id)
+                finalize_bill(org_id, patient.id)
+                print(f"DEBUG: Finalized bill for patient {patient.id} on consultation completion")
+            except Exception as e:
+                print(f"Warning: Could not finalize bill: {e}")
+        elif patient and new_status == 'in_progress':
+            patient.registration_status = 'in_consultation'
+            patient.updated_at = datetime.utcnow()
+        
         db.session.commit()
         
         return jsonify({

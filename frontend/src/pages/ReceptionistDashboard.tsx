@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Patient } from '@/types';
-import api from '@/services/api';
+import { Patient, Bill, BillingStats } from '@/types';
+import api, { billingAPI } from '@/services/api';
 
-type ViewMode = 'dashboard' | 'register' | 'search' | 'triage' | 'appointments' | 'queue';
+type ViewMode = 'dashboard' | 'register' | 'search' | 'triage' | 'appointments' | 'queue' | 'billing';
 
 interface Appointment {
   id: number;
@@ -96,6 +96,19 @@ export default function NewReceptionistDashboard() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [queueStats, setQueueStats] = useState({ total: 0, waiting: 0, emergency: 0, urgent: 0 });
 
+  // Billing state
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [billingStats, setBillingStats] = useState<BillingStats>({
+    pending_payments: 0, today_collections: 0, today_total_billed: 0,
+    outstanding_amount: 0, today_bills: 0, paid_today: 0
+  });
+  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentData, setPaymentData] = useState({
+    amount_paid: 0, payment_method: 'cash', payment_reference: '', payment_notes: '', discount_amount: 0
+  });
+  const [billingFilter, setBillingFilter] = useState('pending_payment');
+
   // Form states
   const [registrationData, setRegistrationData] = useState<PatientRegistrationData>({
     first_name: '',
@@ -144,6 +157,7 @@ export default function NewReceptionistDashboard() {
     loadDoctors();
     loadQueue();
     loadAppointments(selectedDate);
+    loadBillingStats();
 
     // Auto-refresh queue and appointments every 30 seconds
     const interval = setInterval(() => {
@@ -152,6 +166,10 @@ export default function NewReceptionistDashboard() {
       }
       if (currentView === 'appointments') {
         loadAppointments(selectedDate);
+      }
+      if (currentView === 'billing') {
+        loadBills();
+        loadBillingStats();
       }
     }, 30000);
 
@@ -217,6 +235,67 @@ export default function NewReceptionistDashboard() {
     setMessage({ type, text });
     setTimeout(() => setMessage({ type: '', text: '' }), 5000);
   };
+
+  // Billing functions
+  const loadBills = async () => {
+    try {
+      const response = await billingAPI.getBills({ status: billingFilter });
+      setBills(response.bills || []);
+    } catch (error) {
+      console.error('Failed to load bills:', error);
+    }
+  };
+
+  const loadBillingStats = async () => {
+    try {
+      const response = await billingAPI.getStats();
+      setBillingStats(response);
+    } catch (error) {
+      console.error('Failed to load billing stats:', error);
+    }
+  };
+
+  const handleProcessPayment = async () => {
+    if (!selectedBill) return;
+    if (paymentData.amount_paid <= 0) {
+      showMessage('error', 'Payment amount must be greater than 0');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await billingAPI.processPayment(selectedBill.id, paymentData);
+      showMessage('success', `Payment of ${paymentData.amount_paid.toFixed(2)} processed for Bill #${selectedBill.bill_number}`);
+      setShowPaymentModal(false);
+      setSelectedBill(null);
+      setPaymentData({ amount_paid: 0, payment_method: 'cash', payment_reference: '', payment_notes: '', discount_amount: 0 });
+      await loadBills();
+      await loadBillingStats();
+    } catch (error: any) {
+      showMessage('error', error.response?.data?.error || 'Payment processing failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openPaymentModal = (bill: Bill) => {
+    setSelectedBill(bill);
+    setPaymentData({
+      amount_paid: bill.balance_due,
+      payment_method: 'cash',
+      payment_reference: '',
+      payment_notes: '',
+      discount_amount: 0
+    });
+    setShowPaymentModal(true);
+  };
+
+  useEffect(() => {
+    if (currentView === 'billing') {
+      loadBills();
+      loadBillingStats();
+    }
+  }, [billingFilter, currentView]);
 
   const resetForms = () => {
     setRegistrationData({
@@ -378,7 +457,7 @@ export default function NewReceptionistDashboard() {
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Receptionist Dashboard</h2>
         
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <button
             onClick={() => setCurrentView('register')}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2 transition-colors"
@@ -436,10 +515,26 @@ export default function NewReceptionistDashboard() {
           </button>
           
           <button
+            onClick={() => setCurrentView('billing')}
+            className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 flex items-center justify-center space-x-2 transition-colors relative"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span>Billing</span>
+            {billingStats.pending_payments > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {billingStats.pending_payments}
+              </span>
+            )}
+          </button>
+          
+          <button
             onClick={() => {
               loadTodaysPatients();
               loadQueue();
               loadAppointments(selectedDate);
+              loadBillingStats();
             }}
             className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center space-x-2 transition-colors"
           >
@@ -1598,6 +1693,171 @@ export default function NewReceptionistDashboard() {
     </div>
   );
 
+  const renderBilling = () => (
+    <div className="space-y-6">
+      {/* Message Display */}
+      {message.text && (
+        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {message.text}
+          <button onClick={() => setMessage({ type: '', text: '' })} className="float-right text-lg">&times;</button>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">💰 Billing & Payments</h2>
+            <p className="text-gray-500">Manage patient bills and process payments</p>
+          </div>
+          <button onClick={() => setCurrentView('dashboard')} className="text-gray-600 hover:text-gray-800 flex items-center">
+            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Dashboard
+          </button>
+        </div>
+
+        {/* Billing Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-600 font-medium">Pending Payments</p>
+            <p className="text-2xl font-bold text-red-700">{billingStats.pending_payments}</p>
+          </div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-sm text-green-600 font-medium">Today's Collections</p>
+            <p className="text-2xl font-bold text-green-700">{billingStats.today_collections.toFixed(2)}</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-600 font-medium">Total Billed Today</p>
+            <p className="text-2xl font-bold text-blue-700">{billingStats.today_total_billed.toFixed(2)}</p>
+          </div>
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <p className="text-sm text-orange-600 font-medium">Outstanding</p>
+            <p className="text-2xl font-bold text-orange-700">{billingStats.outstanding_amount.toFixed(2)}</p>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex space-x-2 border-b pb-2">
+          {[
+            { key: 'pending_payment', label: 'Pending Payment', color: 'text-red-600 border-red-600' },
+            { key: 'partially_paid', label: 'Partially Paid', color: 'text-orange-600 border-orange-600' },
+            { key: 'paid', label: 'Paid', color: 'text-green-600 border-green-600' },
+            { key: 'all', label: 'All Bills', color: 'text-gray-600 border-gray-600' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setBillingFilter(tab.key)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                billingFilter === tab.key
+                  ? `${tab.color} border-b-2 bg-white`
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <button
+            onClick={() => { loadBills(); loadBillingStats(); }}
+            className="ml-auto px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+          >
+            🔄 Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Bills List */}
+      <div className="bg-white rounded-lg shadow">
+        {bills.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+            </svg>
+            <p className="text-lg">No bills found</p>
+            <p className="text-sm mt-1">Bills are automatically generated when patients receive services</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {bills.map((bill) => (
+              <div key={bill.id} className={`p-5 hover:bg-gray-50 transition-colors ${
+                bill.status === 'pending_payment' ? 'border-l-4 border-l-red-500' :
+                bill.status === 'partially_paid' ? 'border-l-4 border-l-orange-500' :
+                bill.status === 'paid' ? 'border-l-4 border-l-green-500' :
+                bill.status === 'cancelled' ? 'border-l-4 border-l-gray-400' : ''
+              }`}>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center mb-2">
+                      <h4 className="text-lg font-bold text-gray-900 mr-3">{bill.patient_name}</h4>
+                      <span className="text-sm text-gray-500 mr-3">ID: {bill.patient_identifier}</span>
+                      <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                        bill.status === 'pending_payment' ? 'bg-red-100 text-red-800' :
+                        bill.status === 'partially_paid' ? 'bg-orange-100 text-orange-800' :
+                        bill.status === 'paid' ? 'bg-green-100 text-green-800' :
+                        bill.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {bill.status.replace('_', ' ').toUpperCase()}
+                      </span>
+                    </div>
+                    
+                    <p className="text-sm text-gray-500 mb-2">
+                      Bill #{bill.bill_number} • {new Date(bill.visit_date).toLocaleDateString()} • {bill.item_count} item(s)
+                    </p>
+
+                    {/* Bill Items Preview */}
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {bill.items.map((item) => (
+                        <span key={item.id} className={`text-xs px-2 py-1 rounded-full ${
+                          item.item_type === 'consultation' ? 'bg-blue-100 text-blue-700' :
+                          item.item_type === 'lab_test' ? 'bg-purple-100 text-purple-700' :
+                          item.item_type === 'medication' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {item.item_type === 'consultation' ? '🩺' : item.item_type === 'lab_test' ? '🧪' : item.item_type === 'medication' ? '💊' : '📋'} {item.description}: {item.total_price.toFixed(2)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="text-right ml-4">
+                    <p className="text-2xl font-bold text-gray-900">{bill.total_amount.toFixed(2)}</p>
+                    {bill.paid_amount > 0 && (
+                      <p className="text-sm text-green-600">Paid: {bill.paid_amount.toFixed(2)}</p>
+                    )}
+                    {bill.discount_amount > 0 && (
+                      <p className="text-sm text-orange-600">Discount: {bill.discount_amount.toFixed(2)}</p>
+                    )}
+                    {bill.balance_due > 0 && (
+                      <p className="text-lg font-semibold text-red-600">Due: {bill.balance_due.toFixed(2)}</p>
+                    )}
+                    
+                    {(bill.status === 'pending_payment' || bill.status === 'partially_paid') && (
+                      <button
+                        onClick={() => openPaymentModal(bill)}
+                        className="mt-2 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 font-semibold transition-colors"
+                      >
+                        💳 Process Payment
+                      </button>
+                    )}
+                    
+                    {bill.status === 'paid' && bill.paid_at && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Paid: {new Date(bill.paid_at).toLocaleString()}
+                        {bill.payment_method && ` (${bill.payment_method})`}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -1612,7 +1872,155 @@ export default function NewReceptionistDashboard() {
         {currentView === 'triage' && renderTriage()}
         {currentView === 'appointments' && renderAppointments()}
         {currentView === 'queue' && renderQueue()}
+        {currentView === 'billing' && renderBilling()}
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedBill && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Process Payment</h3>
+                <button onClick={() => { setShowPaymentModal(false); setSelectedBill(null); }} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+              </div>
+
+              {/* Bill Summary */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <p className="text-sm text-gray-600">Bill #<span className="font-semibold">{selectedBill.bill_number}</span></p>
+                <p className="text-lg font-bold text-gray-900">{selectedBill.patient_name}</p>
+                <p className="text-sm text-gray-500">ID: {selectedBill.patient_identifier}</p>
+                <div className="mt-3 border-t pt-3 space-y-1">
+                  {selectedBill.items.map((item) => (
+                    <div key={item.id} className="flex justify-between text-sm">
+                      <span className="text-gray-700">
+                        <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                          item.item_type === 'consultation' ? 'bg-blue-500' :
+                          item.item_type === 'lab_test' ? 'bg-purple-500' :
+                          item.item_type === 'medication' ? 'bg-green-500' : 'bg-gray-500'
+                        }`}></span>
+                        {item.description}
+                        {item.quantity > 1 && <span className="text-gray-400 ml-1">x{item.quantity}</span>}
+                      </span>
+                      <span className="font-medium">{item.total_price.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <div className="border-t pt-2 mt-2">
+                    <div className="flex justify-between font-bold text-lg">
+                      <span>Total</span>
+                      <span>{selectedBill.total_amount.toFixed(2)}</span>
+                    </div>
+                    {selectedBill.paid_amount > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Already Paid</span>
+                        <span>-{selectedBill.paid_amount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {selectedBill.discount_amount > 0 && (
+                      <div className="flex justify-between text-sm text-orange-600">
+                        <span>Discount</span>
+                        <span>-{selectedBill.discount_amount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold text-xl text-emerald-700 mt-1">
+                      <span>Balance Due</span>
+                      <span>{selectedBill.balance_due.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentData.amount_paid}
+                    onChange={(e) => setPaymentData({...paymentData, amount_paid: parseFloat(e.target.value) || 0})}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 text-lg font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method *</label>
+                  <select
+                    value={paymentData.payment_method}
+                    onChange={(e) => setPaymentData({...paymentData, payment_method: e.target.value})}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="insurance">Insurance</option>
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Discount Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentData.discount_amount}
+                    onChange={(e) => {
+                      const discount = parseFloat(e.target.value) || 0;
+                      setPaymentData({
+                        ...paymentData,
+                        discount_amount: discount,
+                        amount_paid: selectedBill.balance_due - discount
+                      });
+                    }}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Reference</label>
+                  <input
+                    type="text"
+                    value={paymentData.payment_reference}
+                    onChange={(e) => setPaymentData({...paymentData, payment_reference: e.target.value})}
+                    placeholder="Transaction ID, receipt number, etc."
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={paymentData.payment_notes}
+                    onChange={(e) => setPaymentData({...paymentData, payment_notes: e.target.value})}
+                    placeholder="Optional payment notes"
+                    rows={2}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    onClick={handleProcessPayment}
+                    disabled={loading || paymentData.amount_paid <= 0}
+                    className="flex-1 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-semibold text-lg transition-colors"
+                  >
+                    {loading ? 'Processing...' : `Pay ${paymentData.amount_paid.toFixed(2)}`}
+                  </button>
+                  <button
+                    onClick={() => { setShowPaymentModal(false); setSelectedBill(null); }}
+                    className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

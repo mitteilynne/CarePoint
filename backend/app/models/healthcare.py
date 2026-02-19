@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from datetime import datetime, date
 from sqlalchemy import event, Numeric
 
 class Patient(db.Model):
@@ -700,6 +700,165 @@ class PharmacyInventory(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
+class Bill(db.Model):
+    """Patient bills for tracking all charges during a visit"""
+    __tablename__ = 'bills'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    
+    # Bill identification
+    bill_number = db.Column(db.String(50), nullable=False)  # e.g., "B20260219-0001"
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
+    
+    # Bill amounts
+    total_amount = db.Column(Numeric(12, 2), nullable=False, default=0.00)
+    paid_amount = db.Column(Numeric(12, 2), nullable=False, default=0.00)
+    discount_amount = db.Column(Numeric(12, 2), nullable=False, default=0.00)
+    
+    # Status tracking
+    status = db.Column(db.Enum('open', 'pending_payment', 'partially_paid', 'paid', 'cancelled',
+                               name='bill_status'), nullable=False, default='open')
+    
+    # Payment details
+    payment_method = db.Column(db.Enum('cash', 'card', 'insurance', 'mobile_money', 'bank_transfer', 'other',
+                                       name='payment_methods'))
+    payment_reference = db.Column(db.String(200))  # Transaction ID, insurance claim #, etc.
+    payment_notes = db.Column(db.Text)
+    
+    # Staff tracking
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Receptionist who created
+    paid_to_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Receptionist who received payment
+    
+    # Visit date for grouping
+    visit_date = db.Column(db.Date, nullable=False, default=date.today)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    paid_at = db.Column(db.DateTime)
+    
+    # Relationships
+    organization = db.relationship('Organization', backref=db.backref('bills', lazy='dynamic'))
+    patient = db.relationship('Patient', backref='bills')
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='bills_created')
+    paid_to = db.relationship('User', foreign_keys=[paid_to_id], backref='bills_received')
+    items = db.relationship('BillItem', backref='bill', lazy='dynamic', cascade='all, delete-orphan')
+    
+    # Indexes
+    __table_args__ = (
+        db.UniqueConstraint('organization_id', 'bill_number', name='_org_bill_number_uc'),
+        db.Index('idx_bill_org_patient', 'organization_id', 'patient_id'),
+        db.Index('idx_bill_org_status', 'organization_id', 'status'),
+        db.Index('idx_bill_org_date', 'organization_id', 'visit_date'),
+    )
+    
+    @classmethod
+    def generate_bill_number(cls, organization_id):
+        """Generate a unique bill number for the organization"""
+        today_str = datetime.utcnow().strftime('%Y%m%d')
+        count = cls.query.filter_by(
+            organization_id=organization_id,
+            visit_date=date.today()
+        ).count()
+        return f"B{today_str}-{count + 1:04d}"
+    
+    def recalculate_total(self):
+        """Recalculate total from all bill items"""
+        total = sum(float(item.total_price) for item in self.items.all())
+        self.total_amount = total
+        return total
+    
+    @property
+    def balance_due(self):
+        """Calculate remaining balance"""
+        return float(self.total_amount or 0) - float(self.paid_amount or 0) - float(self.discount_amount or 0)
+    
+    def to_dict(self):
+        """Convert bill to dictionary"""
+        return {
+            'id': self.id,
+            'bill_number': self.bill_number,
+            'patient_id': self.patient_id,
+            'patient_name': self.patient.name if self.patient else None,
+            'patient_identifier': self.patient.patient_id if self.patient else None,
+            'total_amount': float(self.total_amount) if self.total_amount else 0,
+            'paid_amount': float(self.paid_amount) if self.paid_amount else 0,
+            'discount_amount': float(self.discount_amount) if self.discount_amount else 0,
+            'balance_due': self.balance_due,
+            'status': self.status,
+            'payment_method': self.payment_method,
+            'payment_reference': self.payment_reference,
+            'payment_notes': self.payment_notes,
+            'visit_date': self.visit_date.isoformat() if self.visit_date else None,
+            'items': [item.to_dict() for item in self.items.all()],
+            'item_count': self.items.count(),
+            'created_by': f"{self.created_by.first_name} {self.created_by.last_name}" if self.created_by else None,
+            'paid_to': f"{self.paid_to.first_name} {self.paid_to.last_name}" if self.paid_to else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'paid_at': self.paid_at.isoformat() if self.paid_at else None,
+        }
+
+
+class BillItem(db.Model):
+    """Individual line items on a bill"""
+    __tablename__ = 'bill_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    bill_id = db.Column(db.Integer, db.ForeignKey('bills.id'), nullable=False, index=True)
+    
+    # Item details
+    item_type = db.Column(db.Enum('consultation', 'lab_test', 'medication', 'procedure', 'other',
+                                   name='bill_item_types'), nullable=False)
+    description = db.Column(db.String(300), nullable=False)
+    
+    # Pricing
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+    unit_price = db.Column(Numeric(10, 2), nullable=False, default=0.00)
+    total_price = db.Column(Numeric(12, 2), nullable=False, default=0.00)
+    
+    # References to source records
+    lab_test_id = db.Column(db.Integer, db.ForeignKey('lab_tests.id'))
+    prescription_id = db.Column(db.Integer, db.ForeignKey('prescriptions.id'))
+    appointment_id = db.Column(db.Integer, db.ForeignKey('appointments.id'))
+    medical_record_id = db.Column(db.Integer, db.ForeignKey('medical_records.id'))
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    organization = db.relationship('Organization', backref=db.backref('bill_items', lazy='dynamic'))
+    lab_test = db.relationship('LabTest', backref='bill_items')
+    prescription = db.relationship('Prescription', backref='bill_items')
+    appointment = db.relationship('Appointment', backref='bill_items')
+    medical_record = db.relationship('MedicalRecord', backref='bill_items')
+    
+    # Indexes
+    __table_args__ = (
+        db.Index('idx_bill_item_bill', 'bill_id'),
+        db.Index('idx_bill_item_type', 'organization_id', 'item_type'),
+    )
+    
+    def to_dict(self):
+        """Convert bill item to dictionary"""
+        return {
+            'id': self.id,
+            'bill_id': self.bill_id,
+            'item_type': self.item_type,
+            'description': self.description,
+            'quantity': self.quantity,
+            'unit_price': float(self.unit_price) if self.unit_price else 0,
+            'total_price': float(self.total_price) if self.total_price else 0,
+            'lab_test_id': self.lab_test_id,
+            'prescription_id': self.prescription_id,
+            'appointment_id': self.appointment_id,
+            'medical_record_id': self.medical_record_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 # Data isolation enforcement through SQLAlchemy events
 @event.listens_for(Patient, 'before_insert')
 @event.listens_for(Department, 'before_insert')
@@ -712,6 +871,8 @@ class PharmacyInventory(db.Model):
 @event.listens_for(Notification, 'before_insert')
 @event.listens_for(Prescription, 'before_insert')
 @event.listens_for(PharmacyInventory, 'before_insert')
+@event.listens_for(Bill, 'before_insert')
+@event.listens_for(BillItem, 'before_insert')
 def validate_organization_before_insert(mapper, connection, target):
     """Ensure organization_id is always set before inserting records"""
     if not hasattr(target, 'organization_id') or target.organization_id is None:
