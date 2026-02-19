@@ -179,6 +179,41 @@ def dispense_prescription(prescription_id):
         'prescription': prescription.to_dict()
     }), 200
 
+@pharmacist_bp.route('/prescriptions/<int:prescription_id>/pickup', methods=['POST'])
+@jwt_required()
+def mark_prescription_picked_up(prescription_id):
+    """Mark a dispensed prescription as picked up by the patient"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+
+    if not user or user.role not in ['pharmacist', 'admin']:
+        return jsonify({'error': 'Unauthorized access'}), 403
+
+    organization_id = user.organization_id
+    prescription = Prescription.query.filter_by(
+        id=prescription_id,
+        organization_id=organization_id
+    ).first()
+
+    if not prescription:
+        return jsonify({'error': 'Prescription not found'}), 404
+
+    if prescription.status not in ['dispensed', 'partially_dispensed']:
+        return jsonify({'error': f'Cannot mark as picked up: prescription is {prescription.status}'}), 400
+
+    prescription.status = 'picked_up'
+    prescription.picked_up_at = datetime.utcnow()
+    prescription.picked_up_by_id = current_user_id
+    prescription.updated_at = datetime.utcnow()
+
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Prescription marked as picked up successfully',
+        'prescription': prescription.to_dict()
+    }), 200
+
+
 @pharmacist_bp.route('/prescriptions/<int:prescription_id>/refer', methods=['POST'])
 @jwt_required()
 def refer_prescription(prescription_id):
@@ -476,13 +511,28 @@ def get_pharmacist_stats():
     today = datetime.utcnow().date()
     dispensed_today = Prescription.query.filter(
         Prescription.organization_id == organization_id,
-        Prescription.status == 'dispensed',
+        Prescription.status.in_(['dispensed', 'picked_up']),
         db.func.date(Prescription.dispensed_at) == today
     ).count()
-    
+
+    # Count prescriptions dispensed but awaiting pickup (bill paid, ready to collect)
+    awaiting_pickup = Prescription.query.filter(
+        Prescription.organization_id == organization_id,
+        Prescription.status.in_(['dispensed', 'partially_dispensed'])
+    ).count()
+
+    # Count picked up today
+    picked_up_today = Prescription.query.filter(
+        Prescription.organization_id == organization_id,
+        Prescription.status == 'picked_up',
+        db.func.date(Prescription.picked_up_at) == today
+    ).count()
+
     return jsonify({
         'pending_prescriptions': pending_prescriptions,
         'low_stock_items': low_stock_items,
         'out_of_stock_items': out_of_stock_items,
-        'dispensed_today': dispensed_today
+        'dispensed_today': dispensed_today,
+        'awaiting_pickup': awaiting_pickup,
+        'picked_up_today': picked_up_today
     }), 200

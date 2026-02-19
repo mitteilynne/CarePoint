@@ -562,11 +562,15 @@ class Prescription(db.Model):
     instructions = db.Column(db.Text)  # Special instructions
     
     # Status tracking
-    status = db.Column(db.Enum('pending', 'dispensed', 'partially_dispensed', 'cancelled', 'referred', 
+    status = db.Column(db.Enum('pending', 'dispensed', 'partially_dispensed', 'cancelled', 'referred', 'picked_up',
                                name='prescription_status'), nullable=False, default='pending')
     dispensed_quantity = db.Column(db.Integer, default=0)
     dispensed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Pharmacist who dispensed
     dispensed_at = db.Column(db.DateTime)
+    
+    # Pickup tracking (after patient pays and collects medication)
+    picked_up_at = db.Column(db.DateTime)  # When patient collected the medication
+    picked_up_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Pharmacist who handled pickup
     
     # Referral information (if medication not available)
     referral_notes = db.Column(db.Text)  # Where patient was referred to
@@ -583,6 +587,7 @@ class Prescription(db.Model):
     patient = db.relationship('Patient', backref='prescriptions', foreign_keys=[patient_id])
     doctor = db.relationship('User', foreign_keys=[doctor_id], backref='prescriptions_written')
     dispensed_by = db.relationship('User', foreign_keys=[dispensed_by_id], backref='prescriptions_dispensed')
+    picked_up_by = db.relationship('User', foreign_keys=[picked_up_by_id], backref='prescriptions_pickup')
     referred_by = db.relationship('User', foreign_keys=[referred_by_id], backref='prescriptions_referred')
     medical_record = db.relationship('MedicalRecord', backref='prescriptions')
     
@@ -611,6 +616,8 @@ class Prescription(db.Model):
             'status': self.status,
             'dispensed_at': self.dispensed_at.isoformat() if self.dispensed_at else None,
             'dispensed_by': f"{self.dispensed_by.first_name} {self.dispensed_by.last_name}" if self.dispensed_by else None,
+            'picked_up_at': self.picked_up_at.isoformat() if self.picked_up_at else None,
+            'picked_up_by': f"{self.picked_up_by.first_name} {self.picked_up_by.last_name}" if self.picked_up_by else None,
             'referral_notes': self.referral_notes,
             'referred_at': self.referred_at.isoformat() if self.referred_at else None,
             'prescribed_at': self.prescribed_at.isoformat() if self.prescribed_at else None,

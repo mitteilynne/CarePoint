@@ -215,6 +215,11 @@ export const pharmacistAPI = {
     return response.data;
   },
 
+  markPickedUp: async (prescriptionId: number) => {
+    const response = await api.post(`/pharmacist/prescriptions/${prescriptionId}/pickup`, {});
+    return response.data;
+  },
+
   referPrescription: async (prescriptionId: number, data: { referral_notes: string }) => {
     const response = await api.post(`/pharmacist/prescriptions/${prescriptionId}/refer`, data);
     return response.data;

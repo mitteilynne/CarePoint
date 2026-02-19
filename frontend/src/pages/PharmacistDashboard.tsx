@@ -15,9 +15,11 @@ interface Prescription {
   quantity: number;
   dispensed_quantity: number;
   instructions: string;
-  status: 'pending' | 'dispensed' | 'partially_dispensed' | 'cancelled' | 'referred';
+  status: 'pending' | 'dispensed' | 'partially_dispensed' | 'cancelled' | 'referred' | 'picked_up';
   dispensed_at: string | null;
   dispensed_by: string | null;
+  picked_up_at: string | null;
+  picked_up_by: string | null;
   referral_notes: string | null;
   referred_at: string | null;
   prescribed_at: string;
@@ -55,6 +57,8 @@ interface Stats {
   low_stock_items: number;
   out_of_stock_items: number;
   dispensed_today: number;
+  awaiting_pickup: number;
+  picked_up_today: number;
 }
 
 export default function PharmacistDashboard() {
@@ -213,6 +217,18 @@ export default function PharmacistDashboard() {
     }
   };
 
+  const handleMarkPickedUp = async (prescriptionId: number) => {
+    try {
+      await pharmacistAPI.markPickedUp(prescriptionId);
+      fetchPrescriptions();
+      fetchStats();
+      addNotification('Prescription marked as picked up', 'success');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to mark as picked up');
+      console.error('Error marking pickup:', err);
+    }
+  };
+
   const handleRefer = async (prescriptionId: number) => {
     try {
       await pharmacistAPI.referPrescription(prescriptionId, referForm);
@@ -322,8 +338,9 @@ export default function PharmacistDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'dispensed': return 'bg-green-100 text-green-800';
-      case 'partially_dispensed': return 'bg-blue-100 text-blue-800';
+      case 'dispensed': return 'bg-blue-100 text-blue-800';
+      case 'partially_dispensed': return 'bg-orange-100 text-orange-800';
+      case 'picked_up': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-gray-100 text-gray-800';
       case 'referred': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -457,14 +474,15 @@ export default function PharmacistDashboard() {
 
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center">
-                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                <div className="flex-shrink-0 bg-teal-500 rounded-md p-3">
                   <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
                 </div>
                 <div className="ml-5">
-                  <p className="text-sm font-medium text-gray-500">Dispensed Today</p>
-                  <p className="text-2xl font-semibold text-gray-900">{stats.dispensed_today}</p>
+                  <p className="text-sm font-medium text-gray-500">Awaiting Pickup</p>
+                  <p className="text-2xl font-semibold text-gray-900">{stats.awaiting_pickup}</p>
+                  <p className="text-xs text-gray-400">{stats.picked_up_today} picked up today</p>
                 </div>
               </div>
             </div>
@@ -516,7 +534,7 @@ export default function PharmacistDashboard() {
             <div className="p-6">
               {/* Prescription Summary Cards */}
               {prescriptionStatus === 'all' && (
-                <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="mb-6 grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
@@ -525,27 +543,12 @@ export default function PharmacistDashboard() {
                         </svg>
                       </div>
                       <div className="ml-3">
-                        <p className="text-sm font-medium opacity-90">Total Prescriptions</p>
+                        <p className="text-sm font-medium opacity-90">Total</p>
                         <p className="text-xl font-semibold">{prescriptions.length}</p>
                       </div>
                     </div>
                   </div>
-                  <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium opacity-90">Dispensed</p>
-                        <p className="text-xl font-semibold">
-                          {prescriptions.filter(p => p.status === 'dispensed').length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg p-4 text-white">
+                  <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg p-4 text-white">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
                         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -556,6 +559,36 @@ export default function PharmacistDashboard() {
                         <p className="text-sm font-medium opacity-90">Pending</p>
                         <p className="text-xl font-semibold">
                           {prescriptions.filter(p => p.status === 'pending').length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-r from-blue-400 to-blue-500 rounded-lg p-4 text-white">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium opacity-90">Dispensed</p>
+                        <p className="text-xl font-semibold">
+                          {prescriptions.filter(p => p.status === 'dispensed' || p.status === 'partially_dispensed').length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-lg p-4 text-white">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium opacity-90">Picked Up</p>
+                        <p className="text-xl font-semibold">
+                          {prescriptions.filter(p => p.status === 'picked_up').length}
                         </p>
                       </div>
                     </div>
@@ -634,7 +667,7 @@ export default function PharmacistDashboard() {
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-gray-600">Dispensed Rate</span>
                           <span className="text-sm font-medium text-green-600">
-                            {Math.round((prescriptions.filter(p => p.status === 'dispensed').length / prescriptions.length) * 100)}%
+                            {Math.round((prescriptions.filter(p => p.status === 'dispensed' || p.status === 'picked_up' || p.status === 'partially_dispensed').length / prescriptions.length) * 100)}%
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -672,8 +705,9 @@ export default function PharmacistDashboard() {
                   className="px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="pending">Pending Prescriptions</option>
-                  <option value="dispensed">Dispensed Prescriptions</option>
+                  <option value="dispensed">Dispensed - Awaiting Pickup</option>
                   <option value="partially_dispensed">Partially Dispensed</option>
+                  <option value="picked_up">Picked Up</option>
                   <option value="referred">Referred Prescriptions</option>
                   <option value="cancelled">Cancelled Prescriptions</option>
                   <option value="all">All Prescriptions (History)</option>
@@ -775,13 +809,23 @@ export default function PharmacistDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(prescription.status)}`}>
-                              {prescription.status.replace('_', ' ')}
+                              {prescription.status === 'picked_up' ? '✓ Picked Up' : prescription.status.replace(/_/g, ' ')}
                             </span>
                             {prescription.priority === 'urgent' && (
                               <div className="mt-1">
                                 <span className="px-1 inline-flex text-xs leading-4 font-semibold rounded bg-red-100 text-red-800">
                                   URGENT
                                 </span>
+                              </div>
+                            )}
+                            {(prescription.status === 'dispensed' || prescription.status === 'partially_dispensed') && prescription.dispensed_at && (
+                              <div className="mt-1 text-xs text-blue-600">
+                                Dispensed {new Date(prescription.dispensed_at).toLocaleDateString()}
+                              </div>
+                            )}
+                            {prescription.status === 'picked_up' && prescription.picked_up_at && (
+                              <div className="mt-1 text-xs text-teal-600">
+                                {new Date(prescription.picked_up_at).toLocaleDateString()} {new Date(prescription.picked_up_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
                               </div>
                             )}
                           </td>
@@ -806,6 +850,25 @@ export default function PharmacistDashboard() {
                                 >
                                   Refer
                                 </button>
+                              </div>
+                            )}
+                            {(prescription.status === 'dispensed' || prescription.status === 'partially_dispensed') && (
+                              <button
+                                onClick={() => handleMarkPickedUp(prescription.id)}
+                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+                              >
+                                <svg className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                </svg>
+                                Mark Picked Up
+                              </button>
+                            )}
+                            {prescription.status === 'picked_up' && (
+                              <div className="flex items-center text-teal-600">
+                                <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span className="text-xs font-medium">Collected</span>
                               </div>
                             )}
                             {prescription.status === 'referred' && prescription.referral_notes && (
@@ -1374,7 +1437,7 @@ export default function PharmacistDashboard() {
                   <dt className="text-xs font-medium text-gray-500">Current Status</dt>
                   <dd>
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedPrescription.status)}`}>
-                      {selectedPrescription.status.replace('_', ' ')}
+                      {selectedPrescription.status === 'picked_up' ? '✓ Picked Up' : selectedPrescription.status.replace(/_/g, ' ')}
                     </span>
                     {selectedPrescription.priority === 'urgent' && (
                       <span className="ml-2 px-1 inline-flex text-xs leading-4 font-semibold rounded bg-red-100 text-red-800">
@@ -1399,6 +1462,18 @@ export default function PharmacistDashboard() {
                       {new Date(selectedPrescription.dispensed_at).toLocaleDateString()}
                       <div className="text-xs text-gray-500">
                         by {selectedPrescription.dispensed_by}
+                      </div>
+                    </dd>
+                  </div>
+                )}
+                {selectedPrescription.picked_up_at && (
+                  <div>
+                    <dt className="text-xs font-medium text-teal-600">Picked Up</dt>
+                    <dd className="text-sm text-teal-700 font-medium">
+                      {new Date(selectedPrescription.picked_up_at).toLocaleDateString()}
+                      <div className="text-xs text-teal-500">
+                        {new Date(selectedPrescription.picked_up_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                        {selectedPrescription.picked_up_by && ` · via ${selectedPrescription.picked_up_by}`}
                       </div>
                     </dd>
                   </div>
@@ -1438,6 +1513,23 @@ export default function PharmacistDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
                   Refer Patient
+                </button>
+              </div>
+            )}
+            {(selectedPrescription.status === 'dispensed' || selectedPrescription.status === 'partially_dispensed') && (
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => {
+                    handleMarkPickedUp(selectedPrescription.id);
+                    setShowPrescriptionDetailsModal(false);
+                    setSelectedPrescription(null);
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                  Mark as Picked Up
                 </button>
               </div>
             )}
