@@ -96,8 +96,8 @@ def add_consultation_fee(organization_id, patient_id, doctor_id, medical_record_
             appointment_id=appointment_id
         )
         db.session.add(bill_item)
+        db.session.flush()  # Flush first so recalculate_total sees the new item
         bill.recalculate_total()
-        db.session.flush()
     
     return bill
 
@@ -143,8 +143,8 @@ def add_lab_test_fee(organization_id, patient_id, lab_test_id, test_name, fee_am
             lab_test_id=lab_test_id
         )
         db.session.add(bill_item)
+        db.session.flush()  # Flush first so recalculate_total sees the new item
         bill.recalculate_total()
-        db.session.flush()
     
     return bill
 
@@ -177,8 +177,9 @@ def add_medication_fee(organization_id, patient_id, prescription_id, medication_
             prescription_id=prescription_id
         )
         db.session.add(bill_item)
+        db.session.flush()  # Flush first so recalculate_total sees the new item
         bill.recalculate_total()
-        db.session.flush()
+        print(f"DEBUG: Medication bill item added - {medication_name}, qty: {quantity}, unit: {unit_price}, total: {total_price}, bill total: {bill.total_amount}")
     
     return bill
 

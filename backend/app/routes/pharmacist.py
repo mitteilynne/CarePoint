@@ -139,22 +139,40 @@ def dispense_prescription(prescription_id):
     try:
         from app.routes.billing import add_medication_fee
         
-        # Get unit price from inventory item if available
-        unit_price = float(inventory_item.unit_price) if inventory_item and inventory_item.unit_price else 0
+        # Get unit price from inventory item if available, fallback to default
+        unit_price = 0
+        if inventory_item and inventory_item.unit_price:
+            unit_price = float(inventory_item.unit_price)
         
-        if unit_price > 0:
-            add_medication_fee(
-                organization_id=organization_id,
-                patient_id=prescription.patient_id,
-                prescription_id=prescription.id,
-                medication_name=prescription.medication_name,
-                quantity=quantity_dispensed,
-                unit_price=unit_price
-            )
-            db.session.commit()
-            print(f"DEBUG: Added medication fee for {prescription.medication_name} (qty: {quantity_dispensed}, price: {unit_price}) to patient {prescription.patient_id}'s bill")
+        # If no price found from inventory, try to estimate a default
+        if unit_price <= 0:
+            # Look for ANY matching inventory item with a price in the org
+            price_item = PharmacyInventory.query.filter(
+                and_(
+                    PharmacyInventory.organization_id == organization_id,
+                    PharmacyInventory.medication_name.ilike(f'%{prescription.medication_name}%'),
+                    PharmacyInventory.unit_price.isnot(None)
+                )
+            ).first()
+            if price_item and price_item.unit_price:
+                unit_price = float(price_item.unit_price)
+            else:
+                unit_price = 50.00  # Default medication price fallback
+        
+        add_medication_fee(
+            organization_id=organization_id,
+            patient_id=prescription.patient_id,
+            prescription_id=prescription.id,
+            medication_name=prescription.medication_name,
+            quantity=quantity_dispensed,
+            unit_price=unit_price
+        )
+        db.session.commit()
+        print(f"DEBUG: Added medication fee for {prescription.medication_name} (qty: {quantity_dispensed}, price: {unit_price}) to patient {prescription.patient_id}'s bill")
     except Exception as e:
+        import traceback
         print(f"Warning: Could not add medication billing: {e}")
+        traceback.print_exc()
     
     return jsonify({
         'message': 'Prescription dispensed successfully',

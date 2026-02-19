@@ -765,6 +765,9 @@ class Bill(db.Model):
     
     def recalculate_total(self):
         """Recalculate total from all bill items"""
+        from app import db
+        # Flush pending items so they show up in the query
+        db.session.flush()
         total = sum(float(item.total_price) for item in self.items.all())
         self.total_amount = total
         return total
