@@ -479,7 +479,7 @@ class Notification(db.Model):
     title = db.Column(db.String(200), nullable=False)
     message = db.Column(db.Text, nullable=False)
     notification_type = db.Column(db.Enum(
-        'lab_result', 'appointment', 'referral', 'system', 'urgent',
+        'lab_result', 'appointment', 'referral', 'system', 'urgent', 'prescription',
         name='notification_types'
     ), nullable=False)
     
@@ -490,6 +490,7 @@ class Notification(db.Model):
     
     # Related entities (optional)
     lab_test_id = db.Column(db.Integer, db.ForeignKey('lab_tests.id'))
+    prescription_id = db.Column(db.Integer, db.ForeignKey('prescriptions.id'))
     patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'))
     
     # Timestamps
@@ -501,6 +502,7 @@ class Notification(db.Model):
     recipient = db.relationship('User', foreign_keys=[recipient_id], backref='notifications_received')
     sender = db.relationship('User', foreign_keys=[sender_id], backref='notifications_sent')
     lab_test = db.relationship('LabTest', backref='notifications')
+    prescription = db.relationship('Prescription', backref='notifications')
     patient = db.relationship('Patient', backref='notifications')
     
     # Indexes
@@ -524,6 +526,7 @@ class Notification(db.Model):
             'priority': self.priority,
             'is_read': self.is_read,
             'lab_test_id': self.lab_test_id,
+            'prescription_id': self.prescription_id,
             'patient_id': self.patient_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'read_at': self.read_at.isoformat() if self.read_at else None,

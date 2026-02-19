@@ -464,6 +464,33 @@ def create_medical_record():
                             })
                 
                 if prescriptions_created:
+                    # Create notifications for all pharmacists in the organization
+                    from app.models.healthcare import Notification
+                    pharmacists = User.query.filter_by(
+                        organization_id=org_id,
+                        role='pharmacist',
+                        is_active=True
+                    ).all()
+                    
+                    patient = Patient.query.get(data['patient_id'])
+                    doctor = User.query.get(current_user_id)
+                    
+                    # Send one notification per prescription to each pharmacist
+                    for prescription_info in prescriptions_created:
+                        for pharmacist in pharmacists:
+                            notification = Notification(
+                                organization_id=org_id,
+                                recipient_id=pharmacist.id,
+                                sender_id=current_user_id,
+                                title=f'New Prescription: {prescription_info["medication_name"]}',
+                                message=f'Dr. {doctor.first_name} {doctor.last_name} has prescribed {prescription_info["medication_name"]} ({prescription_info.get("dosage", "")}) for patient {patient.first_name} {patient.last_name} (ID: {patient.patient_id})',
+                                notification_type='prescription',
+                                priority='medium',
+                                prescription_id=prescription_info["id"],
+                                patient_id=patient.id
+                            )
+                            db.session.add(notification)
+                    
                     db.session.commit()
                     print(f"DEBUG: Created {len(prescriptions_created)} prescriptions from diagnosis")
                     
@@ -955,6 +982,30 @@ def create_prescription():
     )
     
     db.session.add(prescription)
+    db.session.flush()  # Get the prescription ID
+    
+    # Create notifications for all pharmacists in the organization
+    from app.models.healthcare import Notification
+    pharmacists = User.query.filter_by(
+        organization_id=organization_id,
+        role='pharmacist',
+        is_active=True
+    ).all()
+    
+    for pharmacist in pharmacists:
+        notification = Notification(
+            organization_id=organization_id,
+            recipient_id=pharmacist.id,
+            sender_id=current_user_id,
+            title=f'New Prescription: {prescription.medication_name}',
+            message=f'Dr. {user.first_name} {user.last_name} has prescribed {prescription.medication_name} ({prescription.dosage}) for patient {patient.first_name} {patient.last_name} (ID: {patient.patient_id})',
+            notification_type='prescription',
+            priority='medium',
+            prescription_id=prescription.id,
+            patient_id=patient.id
+        )
+        db.session.add(notification)
+    
     db.session.commit()
     
     return jsonify({
