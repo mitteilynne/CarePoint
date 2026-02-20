@@ -2080,8 +2080,9 @@ export default function NewReceptionistDashboard() {
 
       {/* Edit Patient Modal */}
       {editingPatient && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-start justify-center p-4 pt-6">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-6">
             <div className="flex justify-between items-center p-4 border-b">
               <h3 className="text-lg font-bold text-gray-900">Edit Patient &mdash; {editingPatient.first_name} {editingPatient.last_name}</h3>
               <button onClick={() => setEditingPatient(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
@@ -2147,6 +2148,7 @@ export default function NewReceptionistDashboard() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
