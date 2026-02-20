@@ -296,13 +296,18 @@ def update_patient(patient_id):
     # Update allowed fields
     allowed_fields = [
         'first_name', 'last_name', 'phone', 'email', 'address',
-        'emergency_contact_name', 'emergency_contact_phone',
         'blood_type', 'allergies', 'medical_history'
     ]
     
     for field in allowed_fields:
         if field in data:
             setattr(patient, field, data[field])
+    
+    # Map emergency contact fields to correct model attribute names
+    if 'emergency_contact_name' in data:
+        patient.emergency_contact = data['emergency_contact_name']
+    if 'emergency_contact_phone' in data:
+        patient.emergency_phone = data['emergency_contact_phone']
     
     if 'date_of_birth' in data:
         patient.date_of_birth = datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date()
@@ -315,6 +320,35 @@ def update_patient(patient_id):
             'message': 'Patient updated successfully',
             'patient': patient.to_dict()
         }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/patients/<int:patient_id>', methods=['DELETE'])
+@jwt_required()
+@role_required(['receptionist', 'admin'])
+def delete_patient(patient_id):
+    """Delete (soft-delete) a patient record"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+
+    if not user or not user.organization_id:
+        return jsonify({'error': 'User not found or not associated with organization'}), 404
+
+    patient = Patient.query.filter_by(
+        id=patient_id,
+        organization_id=user.organization_id
+    ).first()
+
+    if not patient:
+        return jsonify({'error': 'Patient not found'}), 404
+
+    try:
+        # Hard delete — remove the patient record
+        db.session.delete(patient)
+        db.session.commit()
+        return jsonify({'message': 'Patient deleted successfully'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

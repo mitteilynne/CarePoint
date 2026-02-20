@@ -51,6 +51,9 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<PatientRegistrationData & { blood_type: string; allergies: string; medical_history: string }>>({}); 
+
   const [registrationData, setRegistrationData] = useState<PatientRegistrationData>({
     first_name: '',
     last_name: '',
@@ -171,6 +174,40 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
     } catch (error) {
       console.error('Search failed:', error);
       showMessage('error', 'Search failed');
+    }
+  };
+
+  const openEditModal = (patient: Patient) => {
+    setEditingPatient(patient);
+    setEditFormData({
+      first_name: patient.first_name,
+      last_name: patient.last_name,
+      phone: patient.phone,
+      email: patient.email || '',
+      date_of_birth: patient.date_of_birth || '',
+      gender: (patient.gender as 'male' | 'female' | 'other') || 'male',
+      address: patient.address || '',
+      emergency_contact_name: patient.emergency_contact || '',
+      emergency_contact_phone: patient.emergency_phone || '',
+      blood_type: (patient as any).blood_type || '',
+      allergies: (patient as any).allergies || '',
+      medical_history: (patient as any).medical_history || '',
+    });
+  };
+
+  const handleEditPatient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPatient) return;
+    setLoading(true);
+    try {
+      await api.put(`/receptionist/patients/${editingPatient.id}`, editFormData);
+      showMessage('success', `Patient ${editFormData.first_name} ${editFormData.last_name} updated successfully`);
+      setEditingPatient(null);
+      await loadTodaysPatients();
+    } catch (error: any) {
+      showMessage('error', error.response?.data?.error || 'Failed to update patient');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -379,17 +416,25 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
                       {patient.current_queue_number ? `#${patient.current_queue_number}` : '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {patient.registration_status === 'registered' && (
+                      <div className="flex items-center space-x-1">
+                        {patient.registration_status === 'registered' && (
+                          <button
+                            onClick={() => {
+                              setSelectedPatient(patient);
+                              setCurrentView('triage');
+                            }}
+                            className="bg-orange-600 text-white px-2 py-1 rounded text-xs hover:bg-orange-700"
+                          >
+                            Triage
+                          </button>
+                        )}
                         <button
-                          onClick={() => {
-                            setSelectedPatient(patient);
-                            setCurrentView('triage');
-                          }}
-                          className="bg-orange-600 text-white px-3 py-1 rounded text-xs hover:bg-orange-700"
+                          onClick={() => openEditModal(patient)}
+                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
                         >
-                          Start Triage
+                          Edit
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -556,18 +601,28 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
                   <div>
                     <div className="font-medium">{patient.first_name} {patient.last_name}</div>
                     <div className="text-sm text-gray-600">ID: {patient.patient_id} | Phone: {patient.phone}</div>
+                    <div className="text-xs text-gray-500 capitalize">{patient.registration_status?.replace('_', ' ')}</div>
                   </div>
-                  {patient.registration_status === 'registered' && (
+                  <div className="flex space-x-2">
+                    {patient.registration_status === 'registered' && (
+                      <button
+                        onClick={() => {
+                          setSelectedPatient(patient);
+                          setCurrentView('triage');
+                        }}
+                        className="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700"
+                      >
+                        Triage
+                      </button>
+                    )}
                     <button
-                      onClick={() => {
-                        setSelectedPatient(patient);
-                        setCurrentView('triage');
-                      }}
-                      className="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700"
+                      onClick={() => openEditModal(patient)}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
                     >
-                      Triage
+                      Edit
                     </button>
-                  )}
+
+                  </div>
                 </div>
               </div>
             ))}
@@ -717,13 +772,87 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
   return (
     <div className="bg-gray-50 rounded-lg border shadow-lg overflow-hidden">
       {renderHeader()}
-      
+
       <div className="min-h-[500px]">
         {currentView === 'dashboard' && renderDashboard()}
         {currentView === 'register' && renderRegistration()}
         {currentView === 'search' && renderSearch()}
         {currentView === 'triage' && renderTriage()}
       </div>
+
+      {/* Edit Patient Modal */}
+      {editingPatient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-4">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-bold text-gray-900">Edit Patient — {editingPatient.first_name} {editingPatient.last_name}</h3>
+              <button onClick={() => setEditingPatient(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <form onSubmit={handleEditPatient} className="p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                  <input type="text" value={editFormData.first_name || ''} onChange={e => setEditFormData(p => ({...p, first_name: e.target.value}))} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                  <input type="text" value={editFormData.last_name || ''} onChange={e => setEditFormData(p => ({...p, last_name: e.target.value}))} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                  <input type="tel" value={editFormData.phone || ''} onChange={e => setEditFormData(p => ({...p, phone: e.target.value}))} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input type="email" value={editFormData.email || ''} onChange={e => setEditFormData(p => ({...p, email: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                  <input type="date" value={editFormData.date_of_birth || ''} onChange={e => setEditFormData(p => ({...p, date_of_birth: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <select value={editFormData.gender || 'male'} onChange={e => setEditFormData(p => ({...p, gender: e.target.value as 'male' | 'female' | 'other'}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Contact</label>
+                  <input type="text" value={editFormData.emergency_contact_name || ''} onChange={e => setEditFormData(p => ({...p, emergency_contact_name: e.target.value}))} placeholder="Contact name" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Phone</label>
+                  <input type="tel" value={editFormData.emergency_contact_phone || ''} onChange={e => setEditFormData(p => ({...p, emergency_contact_phone: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Blood Type</label>
+                  <select value={(editFormData as any).blood_type || ''} onChange={e => setEditFormData(p => ({...p, blood_type: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">Unknown</option>
+                    {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(bt => <option key={bt} value={bt}>{bt}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <textarea value={editFormData.address || ''} onChange={e => setEditFormData(p => ({...p, address: e.target.value}))} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Allergies</label>
+                <textarea value={(editFormData as any).allergies || ''} onChange={e => setEditFormData(p => ({...p, allergies: e.target.value}))} rows={2} placeholder="Known allergies..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="flex justify-end space-x-3 pt-2 border-t">
+                <button type="button" onClick={() => setEditingPatient(null)} className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
