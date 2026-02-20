@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { LabTest } from '@/types';
 
 interface DiagnosisFormProps {
-  labTest: LabTest;
+  labTest?: LabTest;
+  patientId?: number;
+  patientName?: string;
+  chiefComplaint?: string;
   onSubmit: (diagnosisData: DiagnosisFormData) => void;
   onCancel: () => void;
   loading?: boolean;
@@ -32,24 +35,29 @@ export interface DiagnosisFormData {
 
 export default function DiagnosisForm({ 
   labTest, 
+  patientId,
+  patientName,
+  chiefComplaint,
   onSubmit, 
   onCancel, 
   loading = false 
 }: DiagnosisFormProps) {
+  const resolvedPatientId = labTest?.patient_id ?? patientId ?? 0;
+
   const [formData, setFormData] = useState<DiagnosisFormData>({
-    patient_id: labTest.patient_id,
-    chief_complaint: '',
+    patient_id: resolvedPatientId,
+    chief_complaint: chiefComplaint || '',
     diagnosis: '',
     treatment_plan: '',
     medications_prescribed: '',
-    lab_tests_ordered: labTest.test_name,
+    lab_tests_ordered: labTest?.test_name || '',
     follow_up_instructions: '',
     blood_pressure: '',
     heart_rate: undefined,
     temperature: undefined,
     weight: undefined,
     height: undefined,
-    lab_test_id: labTest.id,
+    lab_test_id: labTest?.id,
     referral_type: 'none',
     referral_doctor_id: undefined,
     referral_department_id: undefined,
@@ -74,6 +82,8 @@ export default function DiagnosisForm({
   };
 
   const getSuggestions = () => {
+    if (!labTest) return [];
+
     const testType = labTest.test_type;
     const resultValue = labTest.result_value?.toLowerCase() || '';
     const abnormalFlag = labTest.abnormal_flag;
@@ -121,7 +131,11 @@ export default function DiagnosisForm({
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-xl font-bold text-gray-900">Create Diagnosis</h3>
-          <p className="text-sm text-gray-600">Based on lab test results for {labTest.patient_name}</p>
+          <p className="text-sm text-gray-600">
+            {labTest
+              ? `Based on lab test results for ${labTest.patient_name}`
+              : `Direct consultation for ${patientName || 'patient'}`}
+          </p>
         </div>
         <button
           onClick={onCancel}
@@ -131,34 +145,36 @@ export default function DiagnosisForm({
         </button>
       </div>
 
-      {/* Lab Test Results Summary */}
-      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h4 className="font-semibold text-blue-900 mb-2">Lab Test Results</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div>
-            <p><strong>Test:</strong> {labTest.test_name}</p>
-            <p><strong>Type:</strong> {labTest.test_type.replace('_', ' ')}</p>
-            <p><strong>Result:</strong> {labTest.result_value} {labTest.units}</p>
+      {/* Lab Test Results Summary — only shown when a lab test is linked */}
+      {labTest && (
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 className="font-semibold text-blue-900 mb-2">Lab Test Results</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p><strong>Test:</strong> {labTest.test_name}</p>
+              <p><strong>Type:</strong> {labTest.test_type.replace('_', ' ')}</p>
+              <p><strong>Result:</strong> {labTest.result_value} {labTest.units}</p>
+            </div>
+            <div>
+              <p><strong>Reference Range:</strong> {labTest.reference_range || 'N/A'}</p>
+              <p><strong>Status:</strong> 
+                <span className={`ml-1 px-2 py-1 text-xs rounded-full ${
+                  labTest.abnormal_flag === 'critical' ? 'bg-red-100 text-red-800' :
+                  labTest.abnormal_flag === 'high' || labTest.abnormal_flag === 'low' ? 'bg-orange-100 text-orange-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {labTest.abnormal_flag?.toUpperCase() || 'NORMAL'}
+                </span>
+              </p>
+            </div>
           </div>
-          <div>
-            <p><strong>Reference Range:</strong> {labTest.reference_range || 'N/A'}</p>
-            <p><strong>Status:</strong> 
-              <span className={`ml-1 px-2 py-1 text-xs rounded-full ${
-                labTest.abnormal_flag === 'critical' ? 'bg-red-100 text-red-800' :
-                labTest.abnormal_flag === 'high' || labTest.abnormal_flag === 'low' ? 'bg-orange-100 text-orange-800' :
-                'bg-green-100 text-green-800'
-              }`}>
-                {labTest.abnormal_flag?.toUpperCase() || 'NORMAL'}
-              </span>
+          {labTest.result_notes && (
+            <p className="text-sm text-blue-700 mt-2">
+              <strong>Lab Notes:</strong> {labTest.result_notes}
             </p>
-          </div>
+          )}
         </div>
-        {labTest.result_notes && (
-          <p className="text-sm text-blue-700 mt-2">
-            <strong>Lab Notes:</strong> {labTest.result_notes}
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Diagnosis Suggestions */}
       {suggestions.length > 0 && (

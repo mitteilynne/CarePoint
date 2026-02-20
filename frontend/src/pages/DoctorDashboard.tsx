@@ -92,6 +92,7 @@ export default function DoctorDashboard() {
   const [selectedPatientForTest, setSelectedPatientForTest] = useState<number | null>(null);
   const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
   const [selectedLabTestForDiagnosis, setSelectedLabTestForDiagnosis] = useState<LabTest | null>(null);
+  const [selectedPatientForDirectDiagnosis, setSelectedPatientForDirectDiagnosis] = useState<QueuePatient | null>(null);
   const [referrals, setReferrals] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -244,6 +245,7 @@ export default function DoctorDashboard() {
       showMessage('success', message);
       setShowDiagnosisForm(false);
       setSelectedLabTestForDiagnosis(null);
+      setSelectedPatientForDirectDiagnosis(null);
       if (currentView === 'lab-tests') {
         loadLabTests();
       }
@@ -256,6 +258,13 @@ export default function DoctorDashboard() {
 
   const createDiagnosisForLabTest = (labTest: LabTest) => {
     setSelectedLabTestForDiagnosis(labTest);
+    setSelectedPatientForDirectDiagnosis(null);
+    setShowDiagnosisForm(true);
+  };
+
+  const startDirectDiagnosis = (patient: QueuePatient) => {
+    setSelectedPatientForDirectDiagnosis(patient);
+    setSelectedLabTestForDiagnosis(null);
     setShowDiagnosisForm(true);
   };
 
@@ -504,6 +513,12 @@ export default function DoctorDashboard() {
                             ▶️ Start Consultation
                           </button>
                           <button
+                            onClick={() => startDirectDiagnosis(patient)}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            📝 Make Diagnosis
+                          </button>
+                          <button
                             onClick={() => orderLabTestForPatient(parseInt(patient.patient_id))}
                             className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
                           >
@@ -558,6 +573,12 @@ export default function DoctorDashboard() {
                             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                           >
                             ✅ Complete Consultation
+                          </button>
+                          <button
+                            onClick={() => startDirectDiagnosis(patient)}
+                            className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
+                          >
+                            📝 Make Diagnosis
                           </button>
                           <button
                             onClick={() => orderLabTestForPatient(parseInt(patient.patient_id))}
@@ -1437,15 +1458,19 @@ export default function DoctorDashboard() {
         )}
 
         {/* Diagnosis Form Modal */}
-        {showDiagnosisForm && selectedLabTestForDiagnosis && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+        {showDiagnosisForm && (selectedLabTestForDiagnosis || selectedPatientForDirectDiagnosis) && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto">
+            <div className="max-w-5xl w-full my-4">
               <DiagnosisForm
-                labTest={selectedLabTestForDiagnosis}
+                labTest={selectedLabTestForDiagnosis ?? undefined}
+                patientId={selectedPatientForDirectDiagnosis ? parseInt(selectedPatientForDirectDiagnosis.patient_id) : undefined}
+                patientName={selectedPatientForDirectDiagnosis?.patient_name}
+                chiefComplaint={selectedPatientForDirectDiagnosis?.chief_complaint}
                 onSubmit={handleDiagnosisSubmit}
                 onCancel={() => {
                   setShowDiagnosisForm(false);
                   setSelectedLabTestForDiagnosis(null);
+                  setSelectedPatientForDirectDiagnosis(null);
                 }}
                 loading={loading}
               />

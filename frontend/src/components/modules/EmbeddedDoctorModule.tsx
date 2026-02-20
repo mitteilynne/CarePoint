@@ -67,6 +67,7 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
   const [selectedPatientForTest, setSelectedPatientForTest] = useState<number | null>(null);
   const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
   const [selectedLabTestForDiagnosis, setSelectedLabTestForDiagnosis] = useState<LabTest | null>(null);
+  const [selectedPatientForDirectDiagnosis, setSelectedPatientForDirectDiagnosis] = useState<QueuePatient | null>(null);
   const [referrals, setReferrals] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -201,6 +202,7 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
       showMessage('success', message);
       setShowDiagnosisForm(false);
       setSelectedLabTestForDiagnosis(null);
+      setSelectedPatientForDirectDiagnosis(null);
       if (currentView === 'lab-tests') {
         loadLabTests();
       }
@@ -213,6 +215,13 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
 
   const createDiagnosisForLabTest = (labTest: LabTest) => {
     setSelectedLabTestForDiagnosis(labTest);
+    setSelectedPatientForDirectDiagnosis(null);
+    setShowDiagnosisForm(true);
+  };
+
+  const startDirectDiagnosis = (patient: QueuePatient) => {
+    setSelectedPatientForDirectDiagnosis(patient);
+    setSelectedLabTestForDiagnosis(null);
     setShowDiagnosisForm(true);
   };
 
@@ -410,13 +419,21 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
                       {patient.triage_level.replace('_', ' ').toUpperCase()}
                     </span>
                   </div>
-                  <button
-                    onClick={() => handlePatientAction(patient.id, 'in_progress')}
-                    disabled={loading}
-                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Start
-                  </button>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handlePatientAction(patient.id, 'in_progress')}
+                      disabled={loading}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Start
+                    </button>
+                    <button
+                      onClick={() => startDirectDiagnosis(patient)}
+                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                    >
+                      Diagnose
+                    </button>
+                  </div>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">{patient.chief_complaint}</p>
               </div>
@@ -494,6 +511,12 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
                     className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
                   >
                     Order Lab Test
+                  </button>
+                  <button
+                    onClick={() => startDirectDiagnosis(patient)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
+                  >
+                    Make Diagnosis
                   </button>
                 </div>
               </div>
@@ -783,12 +806,24 @@ export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: Embe
       )}
 
       {/* Diagnosis Form Modal */}
-      {showDiagnosisForm && selectedLabTestForDiagnosis && (
-        <DiagnosisForm
-          labTest={selectedLabTestForDiagnosis}
-          onSubmit={handleDiagnosisSubmit}
-          onCancel={() => { setShowDiagnosisForm(false); setSelectedLabTestForDiagnosis(null); }}
-        />
+      {showDiagnosisForm && (selectedLabTestForDiagnosis || selectedPatientForDirectDiagnosis) && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-start justify-center z-50 py-6 overflow-y-auto">
+          <div className="w-full max-w-4xl mx-4">
+            <DiagnosisForm
+              labTest={selectedLabTestForDiagnosis ?? undefined}
+              patientId={selectedPatientForDirectDiagnosis ? parseInt(selectedPatientForDirectDiagnosis.patient_id) : undefined}
+              patientName={selectedPatientForDirectDiagnosis?.patient_name}
+              chiefComplaint={selectedPatientForDirectDiagnosis?.chief_complaint}
+              onSubmit={handleDiagnosisSubmit}
+              onCancel={() => {
+                setShowDiagnosisForm(false);
+                setSelectedLabTestForDiagnosis(null);
+                setSelectedPatientForDirectDiagnosis(null);
+              }}
+              loading={loading}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
