@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Patient, Bill, BillingStats } from '@/types';
 import api, { billingAPI } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 type ViewMode = 'dashboard' | 'register' | 'search' | 'triage' | 'appointments' | 'queue' | 'billing';
 
@@ -79,6 +80,7 @@ interface TriageData {
 }
 
 export default function NewReceptionistDashboard() {
+  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
@@ -108,6 +110,10 @@ export default function NewReceptionistDashboard() {
     amount_paid: 0, payment_method: 'cash', payment_reference: '', payment_notes: '', discount_amount: 0
   });
   const [billingFilter, setBillingFilter] = useState('pending_payment');
+
+  // Receipt state
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [paidBillForReceipt, setPaidBillForReceipt] = useState<Bill | null>(null);
 
   // Edit patient state
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -302,9 +308,12 @@ export default function NewReceptionistDashboard() {
     
     setLoading(true);
     try {
-      await billingAPI.processPayment(selectedBill.id, paymentData);
+      const response = await billingAPI.processPayment(selectedBill.id, paymentData);
       showMessage('success', `Payment of ${paymentData.amount_paid.toFixed(2)} processed for Bill #${selectedBill.bill_number}`);
       setShowPaymentModal(false);
+      // Store paid bill data for receipt (merge with latest response data)
+      setPaidBillForReceipt({ ...selectedBill, ...response.bill, payment_method: paymentData.payment_method, payment_reference: paymentData.payment_reference, paid_amount: paymentData.amount_paid });
+      setShowReceiptModal(true);
       setSelectedBill(null);
       setPaymentData({ amount_paid: 0, payment_method: 'cash', payment_reference: '', payment_notes: '', discount_amount: 0 });
       await loadBills();
@@ -326,6 +335,96 @@ export default function NewReceptionistDashboard() {
       discount_amount: 0
     });
     setShowPaymentModal(true);
+  };
+
+  const printReceipt = (bill: Bill) => {
+    const orgName = user?.organization_name || 'CarePoint Medical Center';
+    const receptionist = bill.paid_to || (user ? `${user.first_name} ${user.last_name}` : 'Receptionist');
+    const paidAt = bill.paid_at ? new Date(bill.paid_at).toLocaleString() : new Date().toLocaleString();
+    const paymentMethodLabel: Record<string, string> = {
+      cash: 'Cash', card: 'Card / POS', insurance: 'Insurance',
+      mobile_money: 'Mobile Money', bank_transfer: 'Bank Transfer', other: 'Other'
+    };
+    const method = paymentMethodLabel[bill.payment_method || 'cash'] || bill.payment_method || 'Cash';
+    const itemRows = bill.items.map(item => `
+      <tr>
+        <td style="padding:6px 4px;border-bottom:1px solid #eee;">${item.description}${item.quantity > 1 ? ` <span style="color:#888;">×${item.quantity}</span>` : ''}</td>
+        <td style="padding:6px 4px;border-bottom:1px solid #eee;text-align:right;">${item.total_price.toFixed(2)}</td>
+      </tr>`).join('');
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Receipt – ${bill.bill_number}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Courier New', monospace; font-size: 13px; color: #111; background: #fff; }
+    .receipt { width: 320px; margin: 0 auto; padding: 24px 16px; }
+    .center { text-align: center; }
+    .org-name { font-size: 18px; font-weight: bold; margin-bottom: 2px; }
+    .subtitle { font-size: 11px; color: #555; margin-bottom: 12px; }
+    .divider { border: none; border-top: 1px dashed #aaa; margin: 10px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 11px; text-transform: uppercase; color: #666; padding-bottom: 4px; }
+    .total-row td { font-weight: bold; font-size: 14px; padding: 8px 4px 0; }
+    .paid-row td { color: #16a34a; padding: 4px 4px 0; }
+    .balance-row td { color: #1d4ed8; font-size: 15px; font-weight: bold; padding: 6px 4px 0; border-top: 1px solid #ddd; }
+    .footer { font-size: 11px; color: #666; margin-top: 14px; text-align: center; }
+    @media print {
+      @page { margin: 0; size: 80mm auto; }
+      body { print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt">
+    <div class="center">
+      <div class="org-name">${orgName}</div>
+      <div class="subtitle">Official Payment Receipt</div>
+    </div>
+    <hr class="divider" />
+    <table>
+      <tr><td style="color:#555;">Receipt No.</td><td style="text-align:right;font-weight:bold;">${bill.bill_number}</td></tr>
+      <tr><td style="color:#555;">Date</td><td style="text-align:right;">${paidAt}</td></tr>
+      <tr><td style="color:#555;">Patient</td><td style="text-align:right;">${bill.patient_name}</td></tr>
+      <tr><td style="color:#555;">Patient ID</td><td style="text-align:right;">${bill.patient_identifier}</td></tr>
+      <tr><td style="color:#555;">Served by</td><td style="text-align:right;">${receptionist}</td></tr>
+    </table>
+    <hr class="divider" />
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:left;">Description</th>
+          <th style="text-align:right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+    <hr class="divider" />
+    <table>
+      <tr class="total-row"><td>Subtotal</td><td style="text-align:right;">${bill.total_amount.toFixed(2)}</td></tr>
+      ${bill.discount_amount > 0 ? `<tr><td style="color:#d97706;">Discount</td><td style="text-align:right;color:#d97706;">-${Number(bill.discount_amount).toFixed(2)}</td></tr>` : ''}
+      <tr class="paid-row"><td>Amount Paid</td><td style="text-align:right;">${Number(bill.paid_amount).toFixed(2)}</td></tr>
+      <tr class="balance-row"><td>Balance</td><td style="text-align:right;">${(Number(bill.total_amount) - Number(bill.paid_amount) - Number(bill.discount_amount || 0)).toFixed(2)}</td></tr>
+    </table>
+    <hr class="divider" />
+    <table>
+      <tr><td style="color:#555;">Payment Method</td><td style="text-align:right;">${method}</td></tr>
+      ${bill.payment_reference ? `<tr><td style="color:#555;">Reference</td><td style="text-align:right;">${bill.payment_reference}</td></tr>` : ''}
+    </table>
+    <div class="footer">
+      <p style="margin-top:8px;">Thank you for your payment!</p>
+      <p>Please keep this receipt for your records.</p>
+    </div>
+  </div>
+  <script>window.onload = function(){ window.print(); };<\/script>
+</body>
+</html>`;
+    const printWindow = window.open('', '_blank', 'width=400,height=650');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
   };
 
   useEffect(() => {
@@ -1899,10 +1998,21 @@ export default function NewReceptionistDashboard() {
                     )}
                     
                     {bill.status === 'paid' && bill.paid_at && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Paid: {new Date(bill.paid_at).toLocaleString()}
-                        {bill.payment_method && ` (${bill.payment_method})`}
-                      </p>
+                      <div className="mt-2">
+                        <p className="text-xs text-gray-400">
+                          Paid: {new Date(bill.paid_at).toLocaleString()}
+                          {bill.payment_method && ` (${bill.payment_method})`}
+                        </p>
+                        <button
+                          onClick={() => printReceipt(bill)}
+                          className="mt-1 inline-flex items-center space-x-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-gray-300"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                          </svg>
+                          <span>Print Receipt</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2073,6 +2183,123 @@ export default function NewReceptionistDashboard() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceiptModal && paidBillForReceipt && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="bg-emerald-600 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="text-lg font-bold">Payment Successful</h3>
+                  <p className="text-emerald-100 text-sm">Bill #{paidBillForReceipt.bill_number}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowReceiptModal(false); setPaidBillForReceipt(null); }}
+                className="text-white/70 hover:text-white text-2xl leading-none"
+              >&times;</button>
+            </div>
+
+            {/* Receipt Preview */}
+            <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* Patient & Bill Info */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Patient</span>
+                  <span className="font-semibold">{paidBillForReceipt.patient_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Patient ID</span>
+                  <span className="font-mono">{paidBillForReceipt.patient_identifier}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Date</span>
+                  <span>{new Date().toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Payment Method</span>
+                  <span className="capitalize">{(paidBillForReceipt.payment_method || 'cash').replace('_', ' ')}</span>
+                </div>
+                {paidBillForReceipt.payment_reference && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Reference</span>
+                    <span className="font-mono text-xs">{paidBillForReceipt.payment_reference}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Bill Items */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Services</h4>
+                <div className="space-y-1">
+                  {paidBillForReceipt.items.map((item) => (
+                    <div key={item.id} className="flex justify-between text-sm">
+                      <span className="text-gray-700 flex items-center">
+                        <span className={`inline-block w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
+                          item.item_type === 'consultation' ? 'bg-blue-500' :
+                          item.item_type === 'lab_test' ? 'bg-purple-500' :
+                          item.item_type === 'medication' ? 'bg-green-500' : 'bg-gray-400'
+                        }`}></span>
+                        {item.description}
+                        {item.quantity > 1 && <span className="text-gray-400 ml-1">×{item.quantity}</span>}
+                      </span>
+                      <span className="font-medium ml-2">{item.total_price.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Totals */}
+              <div className="border-t pt-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span>{paidBillForReceipt.total_amount.toFixed(2)}</span>
+                </div>
+                {paidBillForReceipt.discount_amount > 0 && (
+                  <div className="flex justify-between text-amber-600">
+                    <span>Discount</span>
+                    <span>-{Number(paidBillForReceipt.discount_amount).toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-emerald-700 font-bold text-base border-t pt-2">
+                  <span>Amount Paid</span>
+                  <span>{Number(paidBillForReceipt.paid_amount).toFixed(2)}</span>
+                </div>
+                {(Number(paidBillForReceipt.total_amount) - Number(paidBillForReceipt.paid_amount) - Number(paidBillForReceipt.discount_amount || 0)) > 0 && (
+                  <div className="flex justify-between text-blue-600 font-semibold">
+                    <span>Balance Remaining</span>
+                    <span>{(Number(paidBillForReceipt.total_amount) - Number(paidBillForReceipt.paid_amount) - Number(paidBillForReceipt.discount_amount || 0)).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-5 border-t bg-gray-50 flex space-x-3">
+              <button
+                onClick={() => printReceipt(paidBillForReceipt)}
+                className="flex-1 bg-emerald-600 text-white px-4 py-3 rounded-lg hover:bg-emerald-700 font-semibold transition-colors flex items-center justify-center space-x-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                <span>Print Receipt</span>
+              </button>
+              <button
+                onClick={() => { setShowReceiptModal(false); setPaidBillForReceipt(null); }}
+                className="px-5 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
