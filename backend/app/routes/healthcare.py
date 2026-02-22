@@ -296,6 +296,44 @@ def create_appointment():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@bp.route('/appointments/mine', methods=['GET'])
+@jwt_required()
+@organization_required
+def get_my_appointments():
+    """Get upcoming appointments for the currently authenticated doctor"""
+    try:
+        claims = get_jwt()
+        current_user_id = claims.get('user_id')
+        if not current_user_id:
+            current_user_id = get_jwt_identity()
+
+        upcoming_only = request.args.get('upcoming', 'true').lower() == 'true'
+
+        query = appointment_service.get_organization_scoped_query().filter(
+            Appointment.doctor_id == current_user_id
+        )
+        if upcoming_only:
+            query = query.filter(Appointment.appointment_date >= datetime.utcnow())
+
+        appointments = query.order_by(Appointment.appointment_date.asc()).all()
+
+        return jsonify({
+            'appointments': [{
+                'id': a.id,
+                'patient_id': a.patient_id,
+                'patient_name': f"{a.patient.first_name} {a.patient.last_name}",
+                'patient_phone': a.patient.phone,
+                'appointment_date': a.appointment_date.isoformat(),
+                'duration_minutes': a.duration_minutes,
+                'reason': a.reason,
+                'notes': a.notes,
+                'status': a.status,
+            } for a in appointments],
+            'total': len(appointments)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # Medical Records routes
 @bp.route('/patients/<int:patient_id>/medical-records', methods=['GET'])
 @jwt_required()
