@@ -869,6 +869,59 @@ class BillItem(db.Model):
         }
 
 
+class MedicalRecordTransfer(db.Model):
+    """Track medical records shared with external doctors/facilities"""
+    __tablename__ = 'medical_record_transfers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
+    
+    # Record and patient details
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
+    medical_record_id = db.Column(db.Integer, db.ForeignKey('medical_records.id'), nullable=False)
+    sent_by_doctor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    # Recipient details
+    recipient_name = db.Column(db.String(255), nullable=False)
+    recipient_email = db.Column(db.String(255), nullable=False)
+    recipient_facility = db.Column(db.String(255))
+    recipient_specialty = db.Column(db.String(100))
+    
+    # Transfer details
+    reason = db.Column(db.Text)
+    patient_consent = db.Column(db.Boolean, default=True, nullable=False)
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    status = db.Column(db.Enum('pending', 'sent', 'failed', name='transfer_status'), default='pending', nullable=False)
+    notes = db.Column(db.Text)
+    
+    # Relationships
+    organization = db.relationship('Organization', backref=db.backref('medical_record_transfers', lazy='dynamic'))
+    patient = db.relationship('Patient', backref='record_transfers')
+    medical_record = db.relationship('MedicalRecord', backref='transfers')
+    sent_by = db.relationship('User', backref='records_shared')
+    
+    # Indexes
+    __table_args__ = (
+        db.Index('idx_transfer_org_patient', 'organization_id', 'patient_id'),
+    )
+    
+    def to_dict(self):
+        """Convert transfer to dictionary"""
+        return {
+            'id': self.id,
+            'patient_id': self.patient_id,
+            'medical_record_id': self.medical_record_id,
+            'recipient_name': self.recipient_name,
+            'recipient_email': self.recipient_email,
+            'recipient_facility': self.recipient_facility,
+            'recipient_specialty': self.recipient_specialty,
+            'reason': self.reason,
+            'sent_at': self.sent_at.isoformat() if self.sent_at else None,
+            'status': self.status,
+            'sent_by_doctor': self.sent_by.first_name + ' ' + self.sent_by.last_name if self.sent_by else None,
+        }
+
+
 # Data isolation enforcement through SQLAlchemy events
 @event.listens_for(Patient, 'before_insert')
 @event.listens_for(Department, 'before_insert')
@@ -883,6 +936,7 @@ class BillItem(db.Model):
 @event.listens_for(PharmacyInventory, 'before_insert')
 @event.listens_for(Bill, 'before_insert')
 @event.listens_for(BillItem, 'before_insert')
+@event.listens_for(MedicalRecordTransfer, 'before_insert')
 def validate_organization_before_insert(mapper, connection, target):
     """Ensure organization_id is always set before inserting records"""
     if not hasattr(target, 'organization_id') or target.organization_id is None:

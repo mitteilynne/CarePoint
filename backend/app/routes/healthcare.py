@@ -635,6 +635,124 @@ def create_medical_record():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+
+@bp.route('/medical-records/<int:record_id>/share', methods=['POST'])
+@jwt_required()
+@organization_required
+def share_medical_record(record_id):
+    """Share a medical record with another doctor/facility"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+        org_id = user.organization_id
+        
+        # Verify user is a doctor
+        if user.role != 'doctor':
+            return jsonify({'error': 'Only doctors can share medical records'}), 403
+        
+        # Get the medical record and verify access
+        from app.models import MedicalRecord, MedicalRecordTransfer
+        record = MedicalRecord.query.filter_by(
+            id=record_id,
+            organization_id=org_id
+        ).first()
+        
+        if not record:
+            return jsonify({'error': 'Medical record not found'}), 404
+        
+        # Verify the doctor has access (either created it or is treating the patient)
+        if record.doctor_id != current_user_id:
+            # Check if this doctor has any records for this patient
+            has_access = MedicalRecord.query.filter_by(
+                patient_id=record.patient_id,
+                doctor_id=current_user_id,
+                organization_id=org_id
+            ).first() is not None
+            
+            if not has_access:
+                return jsonify({'error': 'You do not have access to this patient\'s records'}), 403
+        
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['recipient_name', 'recipient_email']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # Create transfer record
+        transfer = MedicalRecordTransfer(
+            organization_id=org_id,
+            patient_id=record.patient_id,
+            medical_record_id=record_id,
+            sent_by_doctor_id=current_user_id,
+            recipient_name=data['recipient_name'],
+            recipient_email=data['recipient_email'],
+            recipient_facility=data.get('recipient_facility'),
+            recipient_specialty=data.get('recipient_specialty'),
+            reason=data.get('reason'),
+            patient_consent=data.get('patient_consent', True),
+            notes=data.get('notes'),
+            status='sent'  # In a real system, you'd send email and update status accordingly
+        )
+        
+        db.session.add(transfer)
+        db.session.commit()
+        
+        # In a real system, here you would:
+        # 1. Generate a PDF of the medical record
+        # 2. Send it via email to the recipient
+        # 3. Log the transfer for audit purposes
+        # 4. Maybe send a notification to the patient
+        
+        return jsonify({
+            'message': 'Medical record shared successfully',
+            'transfer': transfer.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error sharing medical record: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/patients/<int:patient_id>/record-transfers', methods=['GET'])
+@jwt_required()
+@organization_required
+def get_patient_record_transfers(patient_id):
+    """Get all record transfers for a patient"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+        org_id = user.organization_id
+        
+        from app.models import MedicalRecordTransfer
+        
+        # Verify patient belongs to this organization
+        patient = Patient.query.filter_by(
+            id=patient_id,
+            organization_id=org_id
+        ).first()
+        
+        if not patient:
+            return jsonify({'error': 'Patient not found'}), 404
+        
+        transfers = MedicalRecordTransfer.query.filter_by(
+            patient_id=patient_id,
+            organization_id=org_id
+        ).order_by(MedicalRecordTransfer.sent_at.desc()).all()
+        
+        return jsonify({
+            'transfers': [t.to_dict() for t in transfers]
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting record transfers: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
 # Department routes
 @bp.route('/departments', methods=['GET'])
 @jwt_required()

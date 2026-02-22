@@ -98,6 +98,19 @@ export default function DoctorDashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [appointments, setAppointments] = useState<any[]>([]);
+  
+  // Medical record sharing
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [recordToShare, setRecordToShare] = useState<MedicalRecord | null>(null);
+  const [shareFormData, setShareFormData] = useState({
+    recipient_name: '',
+    recipient_email: '',
+    recipient_facility: '',
+    recipient_specialty: '',
+    reason: '',
+    patient_consent: true,
+    notes: ''
+  });
   const [showReturnVisitModal, setShowReturnVisitModal] = useState(false);
   const [returnVisitPatient, setReturnVisitPatient] = useState<QueuePatient | null>(null);
   const [returnVisitData, setReturnVisitData] = useState({
@@ -335,6 +348,37 @@ export default function DoctorDashboard() {
       await loadAppointments();
     } catch (error: any) {
       showMessage('error', error.response?.data?.error || 'Failed to schedule return visit');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const shareRecord = async (record: MedicalRecord) => {
+    setRecordToShare(record);
+    setShowShareModal(true);
+  };
+
+  const handleShareSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recordToShare) return;
+
+    try {
+      setLoading(true);
+      await api.post(`/healthcare/medical-records/${recordToShare.id}/share`, shareFormData);
+      showMessage('success', 'Medical record shared successfully');
+      setShowShareModal(false);
+      setShareFormData({
+        recipient_name: '',
+        recipient_email: '',
+        recipient_facility: '',
+        recipient_specialty: '',
+        reason: '',
+        patient_consent: true,
+        notes: ''
+      });
+    } catch (error: any) {
+      console.error('Error sharing record:', error);
+      showMessage('error', error.response?.data?.error || 'Failed to share medical record');
     } finally {
       setLoading(false);
     }
@@ -902,7 +946,19 @@ export default function DoctorDashboard() {
                   <div>
                     <p className="text-sm text-gray-600">Visit Date: {new Date(record.visit_date).toLocaleDateString()}</p>
                   </div>
-                  <span className="text-sm text-gray-500">Dr. {record.doctor_name}</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">Dr. {record.doctor_name}</span>
+                    <button
+                      onClick={() => shareRecord(record)}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                      title="Share this record with another doctor"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                      <span>Share</span>
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -1048,7 +1104,19 @@ export default function DoctorDashboard() {
                     <div>
                       <p className="text-sm text-gray-600">Visit Date: {new Date(record.visit_date).toLocaleDateString()}</p>
                     </div>
-                    <span className="text-sm text-gray-500">Dr. {record.doctor_name}</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-500">Dr. {record.doctor_name}</span>
+                      <button
+                        onClick={() => shareRecord(record)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                        title="Share this record with another doctor"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        <span>Share</span>
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -1729,6 +1797,150 @@ export default function DoctorDashboard() {
                 }}
                 loading={loading}
               />
+            </div>
+          </div>
+        )}
+
+        {/* Share Medical Record Modal */}
+        {showShareModal && recordToShare && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900">Share Medical Record</h2>
+                  <button
+                    onClick={() => setShowShareModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Record Date:</strong> {new Date(recordToShare.visit_date).toLocaleDateString()}
+                  </p>
+                  <p className="text-sm text-blue-800">
+                    <strong>Diagnosis:</strong> {recordToShare.diagnosis || 'N/A'}
+                  </p>
+                </div>
+
+                <form onSubmit={handleShareSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Recipient Doctor Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={shareFormData.recipient_name}
+                        onChange={(e) => setShareFormData({ ...shareFormData, recipient_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Dr. John Doe"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Recipient Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={shareFormData.recipient_email}
+                        onChange={(e) => setShareFormData({ ...shareFormData, recipient_email: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="doctor@example.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Recipient Facility
+                      </label>
+                      <input
+                        type="text"
+                        value={shareFormData.recipient_facility}
+                        onChange={(e) => setShareFormData({ ...shareFormData, recipient_facility: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Hospital/Clinic Name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Specialty
+                      </label>
+                      <input
+                        type="text"
+                        value={shareFormData.recipient_specialty}
+                        onChange={(e) => setShareFormData({ ...shareFormData, recipient_specialty: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., Cardiology"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Reason for Transfer
+                    </label>
+                    <textarea
+                      value={shareFormData.reason}
+                      onChange={(e) => setShareFormData({ ...shareFormData, reason: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={3}
+                      placeholder="e.g., Patient requested records for second opinion, Specialist referral, etc."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Additional Notes
+                    </label>
+                    <textarea
+                      value={shareFormData.notes}
+                      onChange={(e) => setShareFormData({ ...shareFormData, notes: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={2}
+                      placeholder="Any additional context..."
+                    />
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="patient_consent"
+                      checked={shareFormData.patient_consent}
+                      onChange={(e) => setShareFormData({ ...shareFormData, patient_consent: e.target.checked })}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="patient_consent" className="ml-2 block text-sm text-gray-700">
+                      Patient has consented to share their medical records
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4 border-t">
+                    <button
+                      type="button"
+                      onClick={() => setShowShareModal(false)}
+                      className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading || !shareFormData.patient_consent}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? 'Sharing...' : 'Share Record'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
