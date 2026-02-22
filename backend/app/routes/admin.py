@@ -202,6 +202,80 @@ def get_user_detail(user_id):
         logger.error(f"Error getting user detail: {str(e)}")
         return jsonify({'error': 'Failed to get user detail'}), 500
 
+@bp.route('/users', methods=['POST'])
+@require_admin
+def create_user():
+    """Admin endpoint to create a new user in the organization"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        admin_user = User.query.get(current_user_id)
+        org_id = admin_user.organization_id
+        
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['username', 'email', 'password', 'first_name', 'last_name', 'role']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field.replace("_", " ").title()} is required'}), 400
+        
+        # Validate role
+        valid_roles = ['doctor', 'receptionist', 'lab_technician', 'admin', 'pharmacist']
+        if data['role'] not in valid_roles:
+            return jsonify({'error': 'Invalid role'}), 400
+        
+        # Check if user already exists within organization
+        existing_user = User.query.filter(
+            User.organization_id == org_id,
+            (User.email == data['email'].lower().strip()) | 
+            (User.username == data['username'].lower().strip())
+        ).first()
+        
+        if existing_user:
+            if existing_user.email == data['email'].lower().strip():
+                return jsonify({'error': 'Email already registered in this organization'}), 400
+            else:
+                return jsonify({'error': 'Username already taken in this organization'}), 400
+        
+        # Create new user
+        user = User(
+            organization_id=org_id,
+            username=data['username'].lower().strip(),
+            email=data['email'].lower().strip(),
+            first_name=data['first_name'].strip(),
+            last_name=data['last_name'].strip(),
+            role=data['role'],
+            phone=data.get('phone', '').strip() if data.get('phone') else None,
+            address=data.get('address', '').strip() if data.get('address') else None,
+            is_active=True
+        )
+        user.set_password(data['password'])
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        logger.info(f"Admin {current_user_id} created new user: {user.email} with role {user.role}")
+        
+        return jsonify({
+            'message': 'User created successfully',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role,
+                'phone': user.phone,
+                'is_active': user.is_active,
+                'created_at': user.created_at.isoformat()
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error creating user: {str(e)}")
+        return jsonify({'error': 'Failed to create user'}), 500
+
 @bp.route('/users/<int:user_id>/toggle-status', methods=['POST'])
 @require_admin
 def toggle_user_status(user_id):

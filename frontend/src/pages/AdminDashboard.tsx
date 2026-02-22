@@ -106,6 +106,19 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Create user modal
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    first_name: '',
+    last_name: '',
+    role: 'doctor',
+    phone: '',
+    address: ''
+  });
 
   useEffect(() => {
     if (currentView === 'overview') {
@@ -245,6 +258,35 @@ export default function AdminDashboard() {
     }
   };
 
+  const createUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const response = await api.post('/admin/users', newUserData);
+      setMessage({ type: 'success', text: response.data.message });
+      setShowCreateUserModal(false);
+      setNewUserData({
+        username: '',
+        email: '',
+        password: '',
+        first_name: '',
+        last_name: '',
+        role: 'doctor',
+        phone: '',
+        address: ''
+      });
+      loadUsers();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      setMessage({ 
+        type: 'error', 
+        text: error.response?.data?.error || 'Failed to create user' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateUserRole = async (userId: number, newRole: string) => {
     try {
       const response = await api.put(`/admin/users/${userId}/role`, { role: newRole });
@@ -328,6 +370,20 @@ export default function AdminDashboard() {
 
   const renderUserTable = () => (
     <div className="space-y-4">
+      {/* Add User Button */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-bold text-gray-900">User Management</h3>
+        <button
+          onClick={() => setShowCreateUserModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          <span>Add New User</span>
+        </button>
+      </div>
+
       {/* Filters and Search */}
       <div className="bg-white p-4 rounded-lg shadow-md">
         <form onSubmit={handleSearch} className="flex flex-wrap gap-4 items-end">
@@ -1214,6 +1270,169 @@ export default function AdminDashboard() {
               isOpen={!!selectedReceptionistId}
               onClose={() => setSelectedReceptionistId(null)}
             />
+          )}
+
+          {/* Create User Modal */}
+          {showCreateUserModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900">Add New User</h2>
+                  <button
+                    onClick={() => setShowCreateUserModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <form onSubmit={createUser} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Username */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Username <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newUserData.username}
+                        onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter username"
+                      />
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={newUserData.email}
+                        onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter email"
+                      />
+                    </div>
+
+                    {/* First Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        First Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newUserData.first_name}
+                        onChange={(e) => setNewUserData({ ...newUserData, first_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter first name"
+                      />
+                    </div>
+
+                    {/* Last Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Last Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newUserData.last_name}
+                        onChange={(e) => setNewUserData({ ...newUserData, last_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter last name"
+                      />
+                    </div>
+
+                    {/* Password */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Password <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        value={newUserData.password}
+                        onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter password (min. 6 characters)"
+                      />
+                    </div>
+
+                    {/* Role */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Role <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={newUserData.role}
+                        onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="doctor">Doctor</option>
+                        <option value="receptionist">Receptionist</option>
+                        <option value="lab_technician">Lab Technician</option>
+                        <option value="pharmacist">Pharmacist</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+
+                    {/* Phone (Optional) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={newUserData.phone}
+                        onChange={(e) => setNewUserData({ ...newUserData, phone: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter phone number"
+                      />
+                    </div>
+
+                    {/* Address (Optional) */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Address
+                      </label>
+                      <textarea
+                        value={newUserData.address}
+                        onChange={(e) => setNewUserData({ ...newUserData, address: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter address"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateUserModal(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? 'Creating...' : 'Create User'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
           )}
         </div>
       </div>
