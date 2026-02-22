@@ -28,6 +28,12 @@ interface OrganizationData {
   active_user_count?: number;
   subscription_plan?: string;
   max_users?: number;
+  modules?: {
+    doctor: boolean;
+    receptionist: boolean;
+    lab_technician: boolean;
+    pharmacist: boolean;
+  };
 }
 
 interface OverviewData {
@@ -201,6 +207,24 @@ export default function SuperAdminDashboard() {
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update user status';
+      setError(errorMessage);
+    }
+  };
+
+  // Update module access for organization
+  const updateModuleAccess = async (orgId: number, moduleName: string, enabled: boolean) => {
+    try {
+      const response = await api.put(`/super-admin/organizations/${orgId}/modules`, {
+        [`module_${moduleName}`]: enabled
+      });
+      setSuccessMessage(`${moduleName.replace('_', ' ')} module ${enabled ? 'enabled' : 'disabled'} successfully`);
+      // Update the selected org with the new data
+      if (response.data.organization) {
+        setSelectedOrg((prev) => prev ? { ...prev, modules: response.data.organization.modules } : null);
+      }
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update module access';
       setError(errorMessage);
     }
   };
@@ -743,6 +767,115 @@ export default function SuperAdminDashboard() {
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
                   <p className="text-2xl font-bold text-gray-900 capitalize">{selectedOrg.organization_type}</p>
                   <p className="text-sm text-gray-500">Type</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Module Access Management */}
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Module Access Control</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Enable or disable specific modules for this organization based on their facilities and services.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Doctor Module */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Doctor Module</h4>
+                      <p className="text-xs text-gray-500">Consultations, diagnoses, medical records</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateModuleAccess(selectedOrg.id, 'doctor', !selectedOrg.modules?.doctor)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      selectedOrg.modules?.doctor ? 'bg-green-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        selectedOrg.modules?.doctor ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Receptionist Module */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Receptionist Module</h4>
+                      <p className="text-xs text-gray-500">Registration, triage, queue management</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateModuleAccess(selectedOrg.id, 'receptionist', !selectedOrg.modules?.receptionist)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      selectedOrg.modules?.receptionist ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        selectedOrg.modules?.receptionist ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Lab Technician Module */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Lab Technician Module</h4>
+                      <p className="text-xs text-gray-500">Lab tests, sample processing, results</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateModuleAccess(selectedOrg.id, 'lab_technician', !selectedOrg.modules?.lab_technician)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      selectedOrg.modules?.lab_technician ? 'bg-purple-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        selectedOrg.modules?.lab_technician ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Pharmacist Module */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <svg className="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Pharmacist Module</h4>
+                      <p className="text-xs text-gray-500">Prescriptions, inventory, dispensing</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateModuleAccess(selectedOrg.id, 'pharmacist', !selectedOrg.modules?.pharmacist)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      selectedOrg.modules?.pharmacist ? 'bg-teal-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        selectedOrg.modules?.pharmacist ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
             </div>

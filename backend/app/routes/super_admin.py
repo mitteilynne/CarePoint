@@ -290,6 +290,52 @@ def toggle_organization_status(org_id):
         return jsonify({'error': 'Failed to update organization status'}), 500
 
 
+@bp.route('/organizations/<int:org_id>/modules', methods=['PUT'])
+@require_super_admin
+def update_organization_modules(org_id):
+    """Update which modules an organization has access to"""
+    try:
+        org = Organization.query.get(org_id)
+        if not org:
+            return jsonify({'error': 'Organization not found'}), 404
+        
+        data = request.get_json()
+        
+        # Update module access
+        if 'module_doctor' in data:
+            org.module_doctor = bool(data['module_doctor'])
+        if 'module_receptionist' in data:
+            org.module_receptionist = bool(data['module_receptionist'])
+        if 'module_lab_technician' in data:
+            org.module_lab_technician = bool(data['module_lab_technician'])
+        if 'module_pharmacist' in data:
+            org.module_pharmacist = bool(data['module_pharmacist'])
+        
+        db.session.commit()
+        
+        enabled_modules = []
+        if org.module_doctor:
+            enabled_modules.append('Doctor')
+        if org.module_receptionist:
+            enabled_modules.append('Receptionist')
+        if org.module_lab_technician:
+            enabled_modules.append('Lab Technician')
+        if org.module_pharmacist:
+            enabled_modules.append('Pharmacist')
+        
+        logger.info(f"Updated module access for {org.code}: {', '.join(enabled_modules)}")
+        
+        return jsonify({
+            'message': 'Module access updated successfully',
+            'organization': org.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating organization modules: {str(e)}")
+        return jsonify({'error': 'Failed to update module access'}), 500
+
+
 @bp.route('/organizations', methods=['POST'])
 @require_super_admin
 def create_organization():

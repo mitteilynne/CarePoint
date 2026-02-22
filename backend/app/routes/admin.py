@@ -383,14 +383,8 @@ def get_organization_info():
         admin_user = User.query.get(current_user_id)
         org = admin_user.organization
         
-        org_data = {
-            'id': org.id,
-            'code': org.code,
-            'name': org.name,
-            'type': org.organization_type,
-            'is_active': org.is_active,
-            'created_at': org.created_at.isoformat()
-        }
+        # Use to_dict() method which includes module information
+        org_data = org.to_dict()
         
         return jsonify({'organization': org_data}), 200
         

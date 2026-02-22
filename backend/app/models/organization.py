@@ -24,6 +24,12 @@ class Organization(db.Model):
     subscription_plan = db.Column(db.String(50), default='basic')  # basic, premium, enterprise
     max_users = db.Column(db.Integer, default=50)  # User limit for this organization
     
+    # Module access control - determines which modules this organization can access
+    module_doctor = db.Column(db.Boolean, default=True, nullable=False)
+    module_receptionist = db.Column(db.Boolean, default=True, nullable=False)
+    module_lab_technician = db.Column(db.Boolean, default=True, nullable=False)
+    module_pharmacist = db.Column(db.Boolean, default=True, nullable=False)
+    
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow,
@@ -77,6 +83,12 @@ class Organization(db.Model):
             'is_active': self.is_active,
             'user_count': self.get_user_count(),
             'max_users': self.max_users,
+            'modules': {
+                'doctor': self.module_doctor,
+                'receptionist': self.module_receptionist,
+                'lab_technician': self.module_lab_technician,
+                'pharmacist': self.module_pharmacist
+            },
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 

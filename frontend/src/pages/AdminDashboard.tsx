@@ -37,6 +37,12 @@ interface OrganizationInfo {
   type: string;
   is_active: boolean;
   created_at: string;
+  modules?: {
+    doctor: boolean;
+    receptionist: boolean;
+    lab_technician: boolean;
+    pharmacist: boolean;
+  };
 }
 
 interface DoctorSummary {
@@ -119,6 +125,11 @@ export default function AdminDashboard() {
     phone: '',
     address: ''
   });
+
+  useEffect(() => {
+    // Load organization info on mount to get module permissions
+    loadOrganizationInfo();
+  }, []);
 
   useEffect(() => {
     if (currentView === 'overview') {
@@ -1136,68 +1147,80 @@ export default function AdminDashboard() {
             <div className="mb-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-800">Access Full Modules</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <button
-                  onClick={() => setCurrentView('doctor_module')}
-                  className="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105"
-                >
-                  <div className="flex items-center space-x-4">
-                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div className="text-left">
-                      <h3 className="text-xl font-bold">Doctor Module</h3>
-                      <p className="text-green-100 text-sm">Consultations & Records</p>
+                {/* Doctor Module */}
+                {organizationInfo?.modules?.doctor !== false && (
+                  <button
+                    onClick={() => setCurrentView('doctor_module')}
+                    className="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="text-left">
+                        <h3 className="text-xl font-bold">Doctor Module</h3>
+                        <p className="text-green-100 text-sm">Consultations & Records</p>
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                )}
                 
-                <button
-                  onClick={() => setCurrentView('receptionist_module')}
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105"
-                >
-                <div className="flex items-center space-x-4">
-                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  <div className="text-left">
-                    <h3 className="text-xl font-bold">Receptionist Module</h3>
-                    <p className="text-blue-100 text-sm">Registration, Triage, Queue Management</p>
-                  </div>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => setCurrentView('lab_tech_module')}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow-lg hover:from-purple-600 hover:to-purple-700 transition-all transform hover:scale-105"
-              >
-                <div className="flex items-center space-x-4">
-                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                  </svg>
-                  <div className="text-left">
-                    <h3 className="text-xl font-bold">Lab Tech Module</h3>
-                    <p className="text-purple-100 text-sm">Lab Tests, Sample Processing, Results</p>
-                  </div>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => setCurrentView('pharmacist_module')}
-                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-6 rounded-lg shadow-lg hover:from-teal-600 hover:to-teal-700 transition-all transform hover:scale-105"
-              >
-                <div className="flex items-center space-x-4">
-                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <div className="text-left">
-                    <h3 className="text-xl font-bold">Pharmacist Module</h3>
-                    <p className="text-teal-100 text-sm">Prescriptions, Inventory, Dispensing</p>
-                  </div>
-                </div>
-              </button>
+                {/* Receptionist Module */}
+                {organizationInfo?.modules?.receptionist !== false && (
+                  <button
+                    onClick={() => setCurrentView('receptionist_module')}
+                    className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <div className="text-left">
+                        <h3 className="text-xl font-bold">Receptionist Module</h3>
+                        <p className="text-blue-100 text-sm">Registration, Triage, Queue Management</p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+                
+                {/* Lab Tech Module */}
+                {organizationInfo?.modules?.lab_technician !== false && (
+                  <button
+                    onClick={() => setCurrentView('lab_tech_module')}
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow-lg hover:from-purple-600 hover:to-purple-700 transition-all transform hover:scale-105"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                      </svg>
+                      <div className="text-left">
+                        <h3 className="text-xl font-bold">Lab Tech Module</h3>
+                        <p className="text-purple-100 text-sm">Lab Tests, Sample Processing, Results</p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+                
+                {/* Pharmacist Module */}
+                {organizationInfo?.modules?.pharmacist !== false && (
+                  <button
+                    onClick={() => setCurrentView('pharmacist_module')}
+                    className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-6 rounded-lg shadow-lg hover:from-teal-600 hover:to-teal-700 transition-all transform hover:scale-105"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <div className="text-left">
+                        <h3 className="text-xl font-bold">Pharmacist Module</h3>
+                        <p className="text-teal-100 text-sm">Prescriptions, Inventory, Dispensing</p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
 
 
