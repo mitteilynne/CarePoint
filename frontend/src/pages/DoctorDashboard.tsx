@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Patient, LabTest, LabTestRequest, MedicalRecord, Notification } from '@/types';
-import api, { notificationsAPI, doctorAPI } from '@/services/api';
+import api, { notificationsAPI, doctorAPI, appointmentsAPI } from '@/services/api';
 import LabTestForm from '@/components/LabTestForm';
 import DiagnosisForm, { DiagnosisFormData } from '@/components/DiagnosisForm';
+import { useAuth } from '@/context/AuthContext';
 
-type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'patient-records' | 'lab-tests' | 'referrals' | 'notifications';
+type ViewMode = 'dashboard' | 'queue' | 'triage' | 'records' | 'patient-records' | 'lab-tests' | 'referrals' | 'notifications' | 'appointments';
 
 interface QueuePatient {
   id: number;
@@ -96,11 +97,24 @@ export default function DoctorDashboard() {
   const [referrals, setReferrals] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [showReturnVisitModal, setShowReturnVisitModal] = useState(false);
+  const [returnVisitPatient, setReturnVisitPatient] = useState<QueuePatient | null>(null);
+  const [returnVisitData, setReturnVisitData] = useState({
+    appointment_date: '',
+    appointment_time: '09:00',
+    reason: '',
+    notes: '',
+    duration_minutes: 30,
+  });
+
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     loadQueueStatus();
     loadNotifications();
     loadUnreadCount();
+    loadAppointments();
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
       loadQueueStatus();
@@ -278,6 +292,54 @@ export default function DoctorDashboard() {
     }
   };
 
+  const loadAppointments = async () => {
+    try {
+      const response = await appointmentsAPI.getMyAppointments(true);
+      setAppointments(response.appointments || []);
+    } catch (error) {
+      console.error('Failed to load appointments:', error);
+    }
+  };
+
+  const openReturnVisitModal = (patient: QueuePatient) => {
+    setReturnVisitPatient(patient);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setReturnVisitData({
+      appointment_date: tomorrow.toISOString().split('T')[0],
+      appointment_time: '09:00',
+      reason: '',
+      notes: '',
+      duration_minutes: 30,
+    });
+    setShowReturnVisitModal(true);
+  };
+
+  const handleScheduleReturnVisit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!returnVisitPatient || !currentUser) return;
+    setLoading(true);
+    try {
+      const appointmentDatetime = `${returnVisitData.appointment_date}T${returnVisitData.appointment_time}:00`;
+      await appointmentsAPI.createReturnVisit({
+        patient_id: parseInt(returnVisitPatient.patient_id),
+        doctor_id: currentUser.id,
+        appointment_date: appointmentDatetime,
+        reason: returnVisitData.reason,
+        notes: returnVisitData.notes,
+        duration_minutes: returnVisitData.duration_minutes,
+      });
+      showMessage('success', `Return visit scheduled for ${returnVisitPatient.patient_name} on ${new Date(appointmentDatetime).toLocaleDateString()}`);
+      setShowReturnVisitModal(false);
+      setReturnVisitPatient(null);
+      await loadAppointments();
+    } catch (error: any) {
+      showMessage('error', error.response?.data?.error || 'Failed to schedule return visit');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getTreatmentPriorityColor = (level: string) => {
     switch (level) {
       case 'emergency': return 'bg-red-100 text-red-800 border-red-200';
@@ -399,6 +461,21 @@ export default function DoctorDashboard() {
             </svg>
             <span>Records</span>
           </button>
+
+          <button
+            onClick={() => { setCurrentView('appointments'); loadAppointments(); }}
+            className="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 flex items-center justify-center space-x-2 transition-colors relative"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>Appointments</span>
+            {appointments.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-teal-400 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+                {appointments.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -519,6 +596,12 @@ export default function DoctorDashboard() {
                             📝 Make Diagnosis
                           </button>
                           <button
+                            onClick={() => openReturnVisitModal(patient)}
+                            className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
+                          >
+                            📅 Schedule Return Visit
+                          </button>
+                          <button
                             onClick={() => orderLabTestForPatient(parseInt(patient.patient_id))}
                             className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
                           >
@@ -579,6 +662,12 @@ export default function DoctorDashboard() {
                             className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
                           >
                             📝 Make Diagnosis
+                          </button>
+                          <button
+                            onClick={() => openReturnVisitModal(patient)}
+                            className="bg-teal-700 text-white px-4 py-2 rounded-lg hover:bg-teal-800 transition-colors"
+                          >
+                            📅 Schedule Return Visit
                           </button>
                           <button
                             onClick={() => orderLabTestForPatient(parseInt(patient.patient_id))}
@@ -1421,6 +1510,75 @@ export default function DoctorDashboard() {
     );
   };
 
+  const renderAppointments = () => (
+    <div className="space-y-6">
+      {message.text && (
+        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {message.text}
+          <button onClick={() => setMessage({ type: '', text: '' })} className="float-right text-lg">&times;</button>
+        </div>
+      )}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">My Upcoming Appointments</h2>
+          <div className="flex space-x-3">
+            <button
+              onClick={loadAppointments}
+              className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              🔄 Refresh
+            </button>
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              ← Back
+            </button>
+          </div>
+        </div>
+
+        {appointments.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p className="text-lg font-medium">No upcoming appointments</p>
+            <p className="text-sm mt-1">Return visits you schedule will appear here</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {appointments.map((appt) => (
+              <div key={appt.id} className="border-l-4 border-teal-400 p-4 rounded-lg bg-teal-50">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-lg font-semibold text-gray-900">{appt.patient_name}</span>
+                      <span className={`px-3 py-1 text-sm rounded-full font-medium ${
+                        appt.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                        appt.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                        appt.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {appt.status.toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-gray-700 mb-1">
+                      📅 <strong>{new Date(appt.appointment_date).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}</strong>
+                      <span className="ml-2 text-gray-500">· {appt.duration_minutes} min</span>
+                    </p>
+                    {appt.reason && <p className="text-sm text-gray-700"><strong>Reason:</strong> {appt.reason}</p>}
+                    {appt.notes && <p className="text-sm text-gray-500 italic mt-1">{appt.notes}</p>}
+                    {appt.patient_phone && <p className="text-xs text-gray-400 mt-1">📞 {appt.patient_phone}</p>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -1437,8 +1595,105 @@ export default function DoctorDashboard() {
         {currentView === 'lab-tests' && renderLabTests()}
         {currentView === 'notifications' && renderNotifications()}
         {currentView === 'referrals' && renderReferrals()}
+        {currentView === 'appointments' && renderAppointments()}
 
 
+
+        {/* Return Visit Modal */}
+        {showReturnVisitModal && returnVisitPatient && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+              <div className="flex justify-between items-center p-4 border-b">
+                <h3 className="text-lg font-bold text-gray-900">📅 Schedule Return Visit</h3>
+                <button onClick={() => setShowReturnVisitModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+              </div>
+              <form onSubmit={handleScheduleReturnVisit} className="p-4 space-y-4">
+                <div className="bg-teal-50 p-3 rounded-lg border border-teal-200">
+                  <div className="font-medium text-teal-900">Patient: {returnVisitPatient.patient_name}</div>
+                  <div className="text-sm text-teal-700">Chief Complaint: {returnVisitPatient.chief_complaint}</div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Return Date *</label>
+                    <input
+                      type="date"
+                      value={returnVisitData.appointment_date}
+                      min={new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setReturnVisitData(p => ({...p, appointment_date: e.target.value}))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
+                    <input
+                      type="time"
+                      value={returnVisitData.appointment_time}
+                      onChange={(e) => setReturnVisitData(p => ({...p, appointment_time: e.target.value}))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
+                  <select
+                    value={returnVisitData.duration_minutes}
+                    onChange={(e) => setReturnVisitData(p => ({...p, duration_minutes: parseInt(e.target.value)}))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value={15}>15 minutes</option>
+                    <option value={30}>30 minutes</option>
+                    <option value={45}>45 minutes</option>
+                    <option value={60}>60 minutes</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Return Visit *</label>
+                  <textarea
+                    value={returnVisitData.reason}
+                    onChange={(e) => setReturnVisitData(p => ({...p, reason: e.target.value}))}
+                    rows={2}
+                    placeholder="Follow-up, medication review, test results review..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                  <textarea
+                    value={returnVisitData.notes}
+                    onChange={(e) => setReturnVisitData(p => ({...p, notes: e.target.value}))}
+                    rows={2}
+                    placeholder="Special instructions for the receptionist..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-2 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setShowReturnVisitModal(false)}
+                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                  >
+                    {loading ? 'Scheduling...' : 'Schedule Return Visit'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Lab Test Form Modal */}
         {showLabTestForm && (

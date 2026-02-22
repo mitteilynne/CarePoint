@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Patient } from '@/types';
-import api from '@/services/api';
+import api, { appointmentsAPI } from '@/services/api';
 
-type ViewMode = 'dashboard' | 'register' | 'search' | 'triage';
+type ViewMode = 'dashboard' | 'register' | 'search' | 'triage' | 'appointments';
 
 interface PatientRegistrationData {
   first_name: string;
@@ -53,6 +53,7 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
 
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<PatientRegistrationData & { blood_type: string; allergies: string; medical_history: string }>>({}); 
+  const [appointments, setAppointments] = useState<any[]>([]);
 
   const [registrationData, setRegistrationData] = useState<PatientRegistrationData>({
     first_name: '',
@@ -89,6 +90,7 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
 
   useEffect(() => {
     loadTodaysPatients();
+    loadAppointments();
   }, []);
 
   const loadTodaysPatients = async () => {
@@ -98,6 +100,15 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
     } catch (error) {
       console.error('Failed to load patients:', error);
       showMessage('error', 'Failed to load today\'s patients');
+    }
+  };
+
+  const loadAppointments = async () => {
+    try {
+      const response = await appointmentsAPI.getAllAppointments();
+      setAppointments(response.appointments || []);
+    } catch (error) {
+      console.error('Failed to load appointments:', error);
     }
   };
 
@@ -341,6 +352,21 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             <span className="text-sm">Refresh</span>
+          </button>
+
+          <button
+            onClick={() => { setCurrentView('appointments'); loadAppointments(); }}
+            className="bg-teal-600 text-white px-4 py-3 rounded-lg hover:bg-teal-700 flex flex-col items-center justify-center space-y-1 transition-colors relative"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-sm">Appointments</span>
+            {appointments.filter(a => a.status === 'scheduled').length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-teal-400 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {appointments.filter(a => a.status === 'scheduled').length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -769,6 +795,78 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
     </div>
   );
 
+  const renderAppointments = () => (
+    <div className="space-y-4 p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-bold text-gray-900">Scheduled Appointments</h3>
+        <div className="flex space-x-2">
+          <button
+            onClick={loadAppointments}
+            className="bg-teal-600 text-white px-3 py-2 rounded-lg hover:bg-teal-700 text-sm"
+          >
+            🔄 Refresh
+          </button>
+          <button
+            onClick={() => setCurrentView('dashboard')}
+            className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 text-sm"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+
+      {appointments.length === 0 ? (
+        <div className="text-center py-12 text-gray-500 bg-white rounded-lg border">
+          <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <p className="font-medium">No appointments scheduled</p>
+          <p className="text-sm mt-1">Return visits scheduled by doctors will appear here</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {appointments.map((appt) => (
+            <div key={appt.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-teal-400">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="font-semibold text-gray-900">{appt.patient_name}</span>
+                    <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                      appt.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                      appt.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                      appt.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                      appt.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {appt.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 mb-1">
+                    <svg className="w-4 h-4 inline mr-1 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <strong>{new Date(appt.appointment_date).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}</strong>
+                    <span className="ml-2 text-gray-500">({appt.duration_minutes} min)</span>
+                  </p>
+                  {appt.doctor_name && (
+                    <p className="text-sm text-gray-600">
+                      <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Dr. {appt.doctor_name}
+                    </p>
+                  )}
+                  {appt.reason && <p className="text-sm mt-1"><strong>Reason:</strong> {appt.reason}</p>}
+                  {appt.notes && <p className="text-sm text-gray-500 mt-0.5 italic">{appt.notes}</p>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="bg-gray-50 rounded-lg border shadow-lg overflow-hidden">
       {renderHeader()}
@@ -778,6 +876,7 @@ export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }
         {currentView === 'register' && renderRegistration()}
         {currentView === 'search' && renderSearch()}
         {currentView === 'triage' && renderTriage()}
+        {currentView === 'appointments' && renderAppointments()}
       </div>
 
       {/* Edit Patient Modal */}

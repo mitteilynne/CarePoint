@@ -259,6 +259,31 @@ export const pharmacistAPI = {
   },
 };
 
+// Appointments API
+export const appointmentsAPI = {
+  getMyAppointments: async (upcomingOnly = true) => {
+    const response = await api.get('/healthcare/appointments/mine', { params: { upcoming: upcomingOnly } });
+    return response.data;
+  },
+
+  getAllAppointments: async (params?: { date?: string; doctor_id?: number }) => {
+    const response = await api.get('/healthcare/appointments', { params });
+    return response.data;
+  },
+
+  createReturnVisit: async (data: {
+    patient_id: number;
+    doctor_id: number;
+    appointment_date: string;
+    reason: string;
+    notes?: string;
+    duration_minutes?: number;
+  }) => {
+    const response = await api.post('/healthcare/appointments', data);
+    return response.data;
+  },
+};
+
 // Billing API
 export const billingAPI = {
   getBills: async (params?: { status?: string; search?: string; date?: string }) => {
