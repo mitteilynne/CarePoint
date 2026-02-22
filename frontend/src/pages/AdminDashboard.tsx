@@ -359,7 +359,6 @@ export default function AdminDashboard() {
                 <option value="receptionist">Receptionist</option>
                 <option value="lab_technician">Lab Technician</option>
                 <option value="admin">Admin</option>
-                <option value="patient">Patient</option>
               </select>
             </div>
           )}
@@ -439,7 +438,6 @@ export default function AdminDashboard() {
                       onChange={(e) => updateUserRole(user.id, e.target.value)}
                       className="text-sm border border-gray-300 rounded px-2 py-1"
                     >
-                      <option value="patient">Patient</option>
                       <option value="doctor">Doctor</option>
                       <option value="receptionist">Receptionist</option>
                       <option value="lab_technician">Lab Technician</option>
