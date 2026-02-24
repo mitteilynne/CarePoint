@@ -13,7 +13,8 @@ import {
   Bars3Icon,
   XMarkIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  DocumentChartBarIcon
 } from '@heroicons/react/24/outline';
 
 export interface SidebarSubItem {
@@ -328,6 +329,11 @@ export const getAdminSidebarItems = (counts?: {
     ]
   },
   {
+    key: 'reports',
+    label: 'Reports',
+    icon: DocumentChartBarIcon
+  },
+  {
     key: 'organization',
     label: 'Organization',
     icon: BuildingOffice2Icon
@@ -608,6 +614,11 @@ export const getEnhancedAdminSidebarItems = (counts?: {
         icon: ClipboardDocumentListIcon
       }
     ]
+  },
+  {
+    key: 'reports',
+    label: 'Reports',
+    icon: DocumentChartBarIcon
   },
   {
     key: 'organization',

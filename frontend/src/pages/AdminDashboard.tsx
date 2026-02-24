@@ -7,6 +7,7 @@ import LabTechDetailsModal from '@/components/LabTechDetailsModal';
 import ReceptionistDetailsModal from '@/components/ReceptionistDetailsModal';
 import AdminSidebar, { getEnhancedAdminSidebarItems } from '@/components/AdminSidebar';
 import { EmbeddedDoctorModule, EmbeddedReceptionistModule, EmbeddedLabTechModule, EmbeddedPharmacistModule } from '@/components/modules';
+import ReportsView from '@/components/ReportsView';
 import { ClipboardDocumentListIcon, BeakerIcon, BuildingOffice2Icon, CogIcon } from '@heroicons/react/24/outline';
 
 interface User {
@@ -88,7 +89,7 @@ interface PaginationInfo {
   has_next: boolean;
 }
 
-type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module';
+type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -142,9 +143,10 @@ export default function AdminDashboard() {
       loadLabTechsSummary();
     } else if (currentView === 'receptionists') {
       loadReceptionistsSummary();
-    } else {
+    } else if (currentView === 'users') {
       loadUsers();
     }
+    // 'reports', module views, and dashboard views manage their own data loading
   }, [currentView, currentPage, roleFilter, statusFilter, searchQuery]);
 
   const loadOverview = async () => {
@@ -1115,10 +1117,16 @@ export default function AdminDashboard() {
               {currentView === 'receptionist_module' && 'Receptionist Module'}
               {currentView === 'lab_tech_module' && 'Lab Technician Module'}
               {currentView === 'pharmacist_module' && 'Pharmacist Module'}
+              {currentView === 'reports' && 'Reports & Analytics'}
             </h1>
             {currentView === 'overview' && (
               <p className="mt-2 text-gray-600">
                 Manage users and view system overview
+              </p>
+            )}
+            {currentView === 'reports' && (
+              <p className="mt-2 text-gray-600">
+                Generate and export reports for doctors, lab, and pharmacy departments
               </p>
             )}
             {(currentView.endsWith('_module') || currentView.endsWith('_dashboard')) && (
@@ -1264,6 +1272,7 @@ export default function AdminDashboard() {
                   isEmbedded={true} 
                 />
               )}
+              {currentView === 'reports' && <ReportsView />}
             </div>
           )}
 

@@ -333,4 +333,37 @@ export const billingAPI = {
   },
 };
 
+// Reports API
+export const reportsAPI = {
+  getDoctorReport: async (params?: { start_date?: string; end_date?: string; doctor_id?: number }) => {
+    const response = await api.get('/reports/doctor/summary', { params });
+    return response.data;
+  },
+
+  getLabReport: async (params?: { start_date?: string; end_date?: string; technician_id?: number }) => {
+    const response = await api.get('/reports/lab/summary', { params });
+    return response.data;
+  },
+
+  getPharmacyReport: async (params?: { start_date?: string; end_date?: string }) => {
+    const response = await api.get('/reports/pharmacy/summary', { params });
+    return response.data;
+  },
+
+  exportDoctorReport: async (params?: { start_date?: string; end_date?: string; doctor_id?: number }) => {
+    const response = await api.get('/reports/doctor/export', { params, responseType: 'blob' });
+    return response;
+  },
+
+  exportLabReport: async (params?: { start_date?: string; end_date?: string }) => {
+    const response = await api.get('/reports/lab/export', { params, responseType: 'blob' });
+    return response;
+  },
+
+  exportPharmacyReport: async (params?: { start_date?: string; end_date?: string }) => {
+    const response = await api.get('/reports/pharmacy/export', { params, responseType: 'blob' });
+    return response;
+  },
+};
+
 export default api;
