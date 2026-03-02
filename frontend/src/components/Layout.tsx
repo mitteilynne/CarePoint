@@ -20,7 +20,7 @@ export default function Layout({ children }: LayoutProps) {
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex">
+            <div className="flex pl-12 lg:pl-0">
               <Link
                 to="/"
                 className="flex-shrink-0 flex items-center text-2xl font-bold text-primary-600"
