@@ -510,25 +510,49 @@ function PharmacyReportView({ dateRange, onExport, exporting }: { dateRange: Dat
 // ─── Main Reports Component ───────────────────────────────────────────────────
 
 type ReportTab = 'doctor' | 'lab' | 'pharmacy';
+type PeriodPreset = 'daily' | 'monthly' | 'annual' | 'custom';
 
 export default function ReportsView() {
   const [activeTab, setActiveTab] = useState<ReportTab>('doctor');
   const [exporting, setExporting] = useState(false);
+  const [activePeriod, setActivePeriod] = useState<PeriodPreset>('monthly');
 
-  // Default: last 30 days
+  // Default: current month
   const today = new Date();
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
   const [dateRange, setDateRange] = useState<DateRange>({
-    start_date: thirtyDaysAgo.toISOString().split('T')[0],
+    start_date: firstOfMonth.toISOString().split('T')[0],
     end_date: today.toISOString().split('T')[0]
   });
 
   const [tempRange, setTempRange] = useState<DateRange>({ ...dateRange });
 
   const applyDateRange = () => {
+    setActivePeriod('custom');
     setDateRange({ ...tempRange });
+  };
+
+  const setPeriodPreset = (preset: PeriodPreset) => {
+    const end = new Date();
+    let start: Date;
+
+    if (preset === 'daily') {
+      start = new Date(end);
+    } else if (preset === 'monthly') {
+      start = new Date(end.getFullYear(), end.getMonth(), 1);
+    } else {
+      // annual
+      start = new Date(end.getFullYear(), 0, 1);
+    }
+
+    const range: DateRange = {
+      start_date: start.toISOString().split('T')[0],
+      end_date: end.toISOString().split('T')[0]
+    };
+    setActivePeriod(preset);
+    setTempRange(range);
+    setDateRange(range);
   };
 
   const setQuickRange = (days: number) => {
@@ -539,6 +563,7 @@ export default function ReportsView() {
       start_date: start.toISOString().split('T')[0],
       end_date: end.toISOString().split('T')[0]
     };
+    setActivePeriod('custom');
     setTempRange(range);
     setDateRange(range);
   };
@@ -609,17 +634,48 @@ export default function ReportsView() {
 
           {/* Date Range */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Period Preset Buttons */}
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              {([
+                { key: 'daily', label: 'Daily' },
+                { key: 'monthly', label: 'Monthly' },
+                { key: 'annual', label: 'Annual' },
+              ] as { key: PeriodPreset; label: string }[]).map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setPeriodPreset(p.key)}
+                  className={`text-xs px-3 py-1.5 rounded-md font-medium transition-colors ${
+                    activePeriod === p.key
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Divider */}
+            <span className="text-gray-300 text-sm">|</span>
+
+            {/* Quick Range shortcuts */}
             <div className="flex gap-1">
               {[7, 14, 30, 90].map(days => (
                 <button
                   key={days}
                   onClick={() => setQuickRange(days)}
-                  className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                    activePeriod === 'custom'
+                      ? 'bg-gray-200 text-gray-700'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
                 >
                   {days}d
                 </button>
               ))}
             </div>
+
+            {/* Custom date inputs */}
             <input
               type="date"
               value={tempRange.start_date}
@@ -649,6 +705,11 @@ export default function ReportsView() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         <span>
+          {activePeriod !== 'custom' && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 capitalize">
+              {activePeriod}
+            </span>
+          )}
           Report period: <strong>{dateRange.start_date}</strong> to <strong>{dateRange.end_date}</strong>
         </span>
       </div>
