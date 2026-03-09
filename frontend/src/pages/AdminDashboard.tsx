@@ -215,7 +215,7 @@ export default function AdminDashboard() {
   const loadDoctorsSummary = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/doctors', { 
+      const response = await api.get('/admin/doctors/summary', { 
         params: { days: 30 }
       });
       setDoctorsSummary(response.data.doctors);
