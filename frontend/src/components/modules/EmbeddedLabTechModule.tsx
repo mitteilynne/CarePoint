@@ -20,13 +20,14 @@ interface LabTestWithPatient extends LabTest {
 interface EmbeddedLabTechModuleProps {
   onBack?: () => void;
   isEmbedded?: boolean;
+  initialTab?: 'pending' | 'in_progress' | 'completed';
 }
 
-export default function EmbeddedLabTechModule({ onBack, isEmbedded = true }: EmbeddedLabTechModuleProps) {
+export default function EmbeddedLabTechModule({ onBack, isEmbedded = true, initialTab }: EmbeddedLabTechModuleProps) {
   const [labTests, setLabTests] = useState<LabTestWithPatient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'completed'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'completed'>(initialTab || 'pending');
   const [selectedTest, setSelectedTest] = useState<LabTestWithPatient | null>(null);
 
   useEffect(() => {

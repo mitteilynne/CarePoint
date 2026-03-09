@@ -89,7 +89,7 @@ interface PaginationInfo {
   has_next: boolean;
 }
 
-type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports' | 'patient_registration' | 'triage_management' | 'queue_management' | 'appointment_scheduling' | 'visit_recording' | 'patient_consultations' | 'medical_records' | 'diagnosis_management' | 'lab_test_orders' | 'prescription_writing' | 'patient_queue';
+type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports' | 'patient_registration' | 'triage_management' | 'queue_management' | 'appointment_scheduling' | 'visit_recording' | 'patient_consultations' | 'medical_records' | 'diagnosis_management' | 'lab_test_orders' | 'prescription_writing' | 'patient_queue' | 'test_management' | 'sample_processing' | 'result_entry';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -1127,6 +1127,9 @@ export default function AdminDashboard() {
               {currentView === 'prescription_writing' && 'Prescription Writing'}
               {currentView === 'patient_queue' && 'Patient Queue'}
               {currentView === 'lab_tech_module' && 'Lab Technician Module'}
+              {currentView === 'test_management' && 'Test Management'}
+              {currentView === 'sample_processing' && 'Sample Processing'}
+              {currentView === 'result_entry' && 'Result Entry'}
               {currentView === 'pharmacist_module' && 'Pharmacist Module'}
               {currentView === 'reports' && 'Reports & Analytics'}
             </h1>
@@ -1352,6 +1355,27 @@ export default function AdminDashboard() {
                 <EmbeddedLabTechModule 
                   onBack={() => setCurrentView('overview')} 
                   isEmbedded={true} 
+                />
+              )}
+              {currentView === 'test_management' && (
+                <EmbeddedLabTechModule 
+                  onBack={() => setCurrentView('lab_technicians')} 
+                  isEmbedded={true} 
+                  initialTab="pending"
+                />
+              )}
+              {currentView === 'sample_processing' && (
+                <EmbeddedLabTechModule 
+                  onBack={() => setCurrentView('lab_technicians')} 
+                  isEmbedded={true} 
+                  initialTab="in_progress"
+                />
+              )}
+              {currentView === 'result_entry' && (
+                <EmbeddedLabTechModule 
+                  onBack={() => setCurrentView('lab_technicians')} 
+                  isEmbedded={true} 
+                  initialTab="completed"
                 />
               )}
               {currentView === 'pharmacist_module' && (
