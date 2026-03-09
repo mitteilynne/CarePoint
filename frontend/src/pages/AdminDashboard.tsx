@@ -89,7 +89,7 @@ interface PaginationInfo {
   has_next: boolean;
 }
 
-type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports' | 'patient_registration' | 'triage_management' | 'queue_management' | 'appointment_scheduling' | 'visit_recording';
+type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports' | 'patient_registration' | 'triage_management' | 'queue_management' | 'appointment_scheduling' | 'visit_recording' | 'patient_consultations' | 'medical_records' | 'diagnosis_management' | 'lab_test_orders' | 'prescription_writing' | 'patient_queue';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -1120,6 +1120,12 @@ export default function AdminDashboard() {
               {currentView === 'queue_management' && 'Queue Management'}
               {currentView === 'appointment_scheduling' && 'Appointment Scheduling'}
               {currentView === 'visit_recording' && 'Visit Recording'}
+              {currentView === 'patient_consultations' && 'Patient Consultations'}
+              {currentView === 'medical_records' && 'Medical Records'}
+              {currentView === 'diagnosis_management' && 'Diagnosis Management'}
+              {currentView === 'lab_test_orders' && 'Lab Test Orders'}
+              {currentView === 'prescription_writing' && 'Prescription Writing'}
+              {currentView === 'patient_queue' && 'Patient Queue'}
               {currentView === 'lab_tech_module' && 'Lab Technician Module'}
               {currentView === 'pharmacist_module' && 'Pharmacist Module'}
               {currentView === 'reports' && 'Reports & Analytics'}
@@ -1257,6 +1263,48 @@ export default function AdminDashboard() {
                 <EmbeddedDoctorModule 
                   onBack={() => setCurrentView('overview')} 
                   isEmbedded={true} 
+                />
+              )}
+              {currentView === 'patient_consultations' && (
+                <EmbeddedDoctorModule 
+                  onBack={() => setCurrentView('doctors')} 
+                  isEmbedded={true} 
+                  initialView="queue"
+                />
+              )}
+              {currentView === 'medical_records' && (
+                <EmbeddedDoctorModule 
+                  onBack={() => setCurrentView('doctors')} 
+                  isEmbedded={true} 
+                  initialView="records"
+                />
+              )}
+              {currentView === 'diagnosis_management' && (
+                <EmbeddedDoctorModule 
+                  onBack={() => setCurrentView('doctors')} 
+                  isEmbedded={true} 
+                  initialView="triage"
+                />
+              )}
+              {currentView === 'lab_test_orders' && (
+                <EmbeddedDoctorModule 
+                  onBack={() => setCurrentView('doctors')} 
+                  isEmbedded={true} 
+                  initialView="lab-tests"
+                />
+              )}
+              {currentView === 'prescription_writing' && (
+                <EmbeddedDoctorModule 
+                  onBack={() => setCurrentView('doctors')} 
+                  isEmbedded={true} 
+                  initialView="queue"
+                />
+              )}
+              {currentView === 'patient_queue' && (
+                <EmbeddedDoctorModule 
+                  onBack={() => setCurrentView('doctors')} 
+                  isEmbedded={true} 
+                  initialView="queue"
                 />
               )}
               {currentView === 'receptionist_module' && (

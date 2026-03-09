@@ -53,10 +53,11 @@ interface MedicalRecord {
 interface EmbeddedDoctorModuleProps {
   onBack?: () => void;
   isEmbedded?: boolean;
+  initialView?: ViewMode;
 }
 
-export default function EmbeddedDoctorModule({ onBack, isEmbedded = true }: EmbeddedDoctorModuleProps) {
-  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
+export default function EmbeddedDoctorModule({ onBack, isEmbedded = true, initialView }: EmbeddedDoctorModuleProps) {
+  const [currentView, setCurrentView] = useState<ViewMode>(initialView || 'dashboard');
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
