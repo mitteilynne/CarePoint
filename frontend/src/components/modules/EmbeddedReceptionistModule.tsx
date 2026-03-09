@@ -40,10 +40,11 @@ interface TriageData {
 interface EmbeddedReceptionistModuleProps {
   onBack?: () => void;
   isEmbedded?: boolean;
+  initialView?: ViewMode;
 }
 
-export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true }: EmbeddedReceptionistModuleProps) {
-  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
+export default function EmbeddedReceptionistModule({ onBack, isEmbedded = true, initialView }: EmbeddedReceptionistModuleProps) {
+  const [currentView, setCurrentView] = useState<ViewMode>(initialView || 'dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);

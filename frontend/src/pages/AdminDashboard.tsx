@@ -89,7 +89,7 @@ interface PaginationInfo {
   has_next: boolean;
 }
 
-type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports';
+type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports' | 'patient_registration' | 'triage_management' | 'queue_management' | 'appointment_scheduling' | 'visit_recording';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -1115,6 +1115,11 @@ export default function AdminDashboard() {
               {currentView === 'organization' && 'Organization Settings'}
               {currentView === 'doctor_module' && 'Doctor Module'}
               {currentView === 'receptionist_module' && 'Receptionist Module'}
+              {currentView === 'patient_registration' && 'Patient Registration'}
+              {currentView === 'triage_management' && 'Triage Management'}
+              {currentView === 'queue_management' && 'Queue Management'}
+              {currentView === 'appointment_scheduling' && 'Appointment Scheduling'}
+              {currentView === 'visit_recording' && 'Visit Recording'}
               {currentView === 'lab_tech_module' && 'Lab Technician Module'}
               {currentView === 'pharmacist_module' && 'Pharmacist Module'}
               {currentView === 'reports' && 'Reports & Analytics'}
@@ -1258,6 +1263,41 @@ export default function AdminDashboard() {
                 <EmbeddedReceptionistModule 
                   onBack={() => setCurrentView('overview')} 
                   isEmbedded={true} 
+                />
+              )}
+              {currentView === 'patient_registration' && (
+                <EmbeddedReceptionistModule 
+                  onBack={() => setCurrentView('receptionists')} 
+                  isEmbedded={true} 
+                  initialView="register"
+                />
+              )}
+              {currentView === 'triage_management' && (
+                <EmbeddedReceptionistModule 
+                  onBack={() => setCurrentView('receptionists')} 
+                  isEmbedded={true} 
+                  initialView="triage"
+                />
+              )}
+              {currentView === 'queue_management' && (
+                <EmbeddedReceptionistModule 
+                  onBack={() => setCurrentView('receptionists')} 
+                  isEmbedded={true} 
+                  initialView="dashboard"
+                />
+              )}
+              {currentView === 'appointment_scheduling' && (
+                <EmbeddedReceptionistModule 
+                  onBack={() => setCurrentView('receptionists')} 
+                  isEmbedded={true} 
+                  initialView="appointments"
+                />
+              )}
+              {currentView === 'visit_recording' && (
+                <EmbeddedReceptionistModule 
+                  onBack={() => setCurrentView('receptionists')} 
+                  isEmbedded={true} 
+                  initialView="search"
                 />
               )}
               {currentView === 'lab_tech_module' && (
