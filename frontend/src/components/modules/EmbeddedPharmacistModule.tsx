@@ -39,10 +39,11 @@ interface PharmacyStats {
 interface EmbeddedPharmacistModuleProps {
   onBack?: () => void;
   isEmbedded?: boolean;
+  initialView?: ViewMode;
 }
 
-export default function EmbeddedPharmacistModule({ onBack, isEmbedded = true }: EmbeddedPharmacistModuleProps) {
-  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
+export default function EmbeddedPharmacistModule({ onBack, isEmbedded = true, initialView }: EmbeddedPharmacistModuleProps) {
+  const [currentView, setCurrentView] = useState<ViewMode>(initialView || 'dashboard');
   const [pendingPrescriptions, setPendingPrescriptions] = useState<Prescription[]>([]);
   const [allPrescriptions, setAllPrescriptions] = useState<Prescription[]>([]);
   const [lowStockItems, setLowStockItems] = useState<InventoryItem[]>([]);

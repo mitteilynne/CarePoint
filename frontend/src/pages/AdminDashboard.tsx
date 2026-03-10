@@ -89,7 +89,7 @@ interface PaginationInfo {
   has_next: boolean;
 }
 
-type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports' | 'patient_registration' | 'triage_management' | 'queue_management' | 'appointment_scheduling' | 'visit_recording' | 'patient_consultations' | 'medical_records' | 'diagnosis_management' | 'lab_test_orders' | 'prescription_writing' | 'patient_queue' | 'test_management' | 'sample_processing' | 'result_entry' | 'quality_control' | 'equipment_maintenance';
+type ViewMode = 'overview' | 'users' | 'doctors' | 'receptionists' | 'lab_technicians' | 'organization' | 'doctor_module' | 'receptionist_module' | 'lab_tech_module' | 'pharmacist_module' | 'reports' | 'patient_registration' | 'triage_management' | 'queue_management' | 'appointment_scheduling' | 'visit_recording' | 'patient_consultations' | 'medical_records' | 'diagnosis_management' | 'lab_test_orders' | 'prescription_writing' | 'patient_queue' | 'test_management' | 'sample_processing' | 'result_entry' | 'quality_control' | 'equipment_maintenance' | 'prescription_management' | 'inventory_management' | 'drug_dispensing' | 'stock_monitoring' | 'supplier_management' | 'expiry_tracking';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -1133,6 +1133,12 @@ export default function AdminDashboard() {
               {currentView === 'quality_control' && 'Quality Control'}
               {currentView === 'equipment_maintenance' && 'Equipment Maintenance'}
               {currentView === 'pharmacist_module' && 'Pharmacist Module'}
+              {currentView === 'prescription_management' && 'Prescription Management'}
+              {currentView === 'inventory_management' && 'Inventory Management'}
+              {currentView === 'drug_dispensing' && 'Drug Dispensing'}
+              {currentView === 'stock_monitoring' && 'Stock Monitoring'}
+              {currentView === 'supplier_management' && 'Supplier Management'}
+              {currentView === 'expiry_tracking' && 'Expiry Tracking'}
               {currentView === 'reports' && 'Reports & Analytics'}
             </h1>
             {currentView === 'overview' && (
@@ -1407,6 +1413,51 @@ export default function AdminDashboard() {
                 <EmbeddedPharmacistModule 
                   onBack={() => setCurrentView('overview')} 
                   isEmbedded={true} 
+                />)}
+              {currentView === 'prescription_management' && (
+                <EmbeddedPharmacistModule 
+                  onBack={() => setCurrentView('pharmacist_module')} 
+                  isEmbedded={true} 
+                  initialView="prescriptions"
+                />
+              )}
+              {currentView === 'inventory_management' && (
+                <EmbeddedPharmacistModule 
+                  onBack={() => setCurrentView('pharmacist_module')} 
+                  isEmbedded={true} 
+                  initialView="inventory"
+                />
+              )}
+              {currentView === 'drug_dispensing' && (
+                <EmbeddedPharmacistModule 
+                  onBack={() => setCurrentView('pharmacist_module')} 
+                  isEmbedded={true} 
+                  initialView="prescriptions"
+                />
+              )}
+              {currentView === 'stock_monitoring' && (
+                <EmbeddedPharmacistModule 
+                  onBack={() => setCurrentView('pharmacist_module')} 
+                  isEmbedded={true} 
+                  initialView="inventory"
+                />
+              )}
+              {currentView === 'supplier_management' && (
+                <div className="bg-white rounded-lg shadow p-8 text-center">
+                  <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Supplier Management</h3>
+                  <p className="text-gray-500">Supplier management and procurement tracking features are coming soon.</p>
+                </div>
+              )}
+              {currentView === 'expiry_tracking' && (
+                <EmbeddedPharmacistModule 
+                  onBack={() => setCurrentView('pharmacist_module')} 
+                  isEmbedded={true} 
+                  initialView="inventory"
                 />
               )}
               {currentView === 'reports' && <ReportsView />}
